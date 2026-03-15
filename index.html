@@ -15,7 +15,12 @@
       overflow: hidden;
       font-family: monospace;
     }
-    canvas { display: block; image-rendering: pixelated; }
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      -ms-interpolation-mode: nearest-neighbor;
+    }
 
     #loading {
       position: fixed;

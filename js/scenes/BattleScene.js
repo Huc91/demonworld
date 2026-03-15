@@ -26,6 +26,9 @@ class BattleScene extends Phaser.Scene {
     this._zoomObjs   = [];
     this._dragHlObjs = [];
 
+    // Battle log
+    this._logLines = [];
+
     // Drag state
     this.dragInfo  = null;  // { card, handIdx }
     this.dragGhost = null;
@@ -65,8 +68,8 @@ class BattleScene extends Phaser.Scene {
     bg.lineStyle(1, 0x222244); bg.lineBetween(0, 510, 960, 510);
 
     // ── Pitch zone label ───────────────────────────────────────────────
-    this.add.text(480, 447, '🔥  PITCH ZONE  — drag cards here to sacrifice for mana  (or right-click a card)', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#884422'
+    this.add.text(480, 447, '🔥  PITCH ZONE  — drag here or right-click to sacrifice for mana', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#884422'
     }).setOrigin(0.5);
 
     // ── Enemy header ───────────────────────────────────────────────────
@@ -74,13 +77,13 @@ class BattleScene extends Phaser.Scene {
       fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
       color: '#ff4444', stroke: '#000', strokeThickness: 4
     });
-    this.txtEnemyLife  = this.add.text(10, 30, '', { fontSize: '13px', fontFamily: 'monospace', color: '#ff7777' });
-    this.txtEnemyDeck  = this.add.text(780, 10, '', { fontSize: '12px', fontFamily: 'monospace', color: '#666688' });
-    this.txtEnemyHand  = this.add.text(780, 26, '', { fontSize: '12px', fontFamily: 'monospace', color: '#666688' });
+    this.txtEnemyLife  = this.add.text(10, 32, '', { fontSize: '16px', fontFamily: 'monospace', color: '#ff7777', stroke: '#000', strokeThickness: 2 });
+    this.txtEnemyDeck  = this.add.text(780, 10, '', { fontSize: '13px', fontFamily: 'monospace', color: '#666688' });
+    this.txtEnemyHand  = this.add.text(780, 26, '', { fontSize: '13px', fontFamily: 'monospace', color: '#666688' });
 
     // Clickable enemy face for direct attacks
     this.btnFace = this.add.text(880, 22, '⚔ FACE', {
-      fontSize: '13px', fontFamily: 'monospace',
+      fontSize: '16px', fontFamily: 'monospace',
       backgroundColor: '#3a0000', padding: { x: 8, y: 4 }, color: '#ff6666'
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     this.btnFace.on('pointerdown', () => this.attackFace());
@@ -88,24 +91,24 @@ class BattleScene extends Phaser.Scene {
     this.btnFace.on('pointerout',  () => this.btnFace.setStyle({ backgroundColor: '#3a0000' }));
 
     // Board zone labels
-    this.add.text(480, 50, '— ENEMY BOARD —',   { fontSize: '10px', fontFamily: 'monospace', color: '#442233' }).setOrigin(0.5, 0);
-    this.add.text(480, 270, '— YOUR BOARD —',   { fontSize: '10px', fontFamily: 'monospace', color: '#223322' }).setOrigin(0.5, 0);
-    this.add.text(480, 512, '— HAND  (hover to zoom · drag to board to play · drag to pitch zone or right-click to sacrifice) —', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#333355'
+    this.add.text(480, 50, '— ENEMY BOARD —',   { fontSize: '13px', fontFamily: 'monospace', color: '#442233' }).setOrigin(0.5, 0);
+    this.add.text(480, 270, '— YOUR BOARD —',   { fontSize: '13px', fontFamily: 'monospace', color: '#223322' }).setOrigin(0.5, 0);
+    this.add.text(480, 512, '— HAND  (hover to zoom · drag to board · right-click to pitch) —', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#333355'
     }).setOrigin(0.5, 0);
 
     // ── Player info bar ────────────────────────────────────────────────
-    this.txtPlayerLife = this.add.text(10, 479, '', { fontSize: '13px', fontFamily: 'monospace', color: '#44ff88', stroke: '#000', strokeThickness: 2 });
-    this.txtPlayerMana = this.add.text(250, 479, '', { fontSize: '13px', fontFamily: 'monospace', color: '#5599ff', stroke: '#000', strokeThickness: 2 });
-    this.txtDeckInfo   = this.add.text(550, 479, '', { fontSize: '11px', fontFamily: 'monospace', color: '#555566' });
+    this.txtPlayerLife = this.add.text(10, 477, '', { fontSize: '16px', fontFamily: 'monospace', color: '#44ff88', stroke: '#000', strokeThickness: 2 });
+    this.txtPlayerMana = this.add.text(260, 477, '', { fontSize: '16px', fontFamily: 'monospace', color: '#5599ff', stroke: '#000', strokeThickness: 2 });
+    this.txtDeckInfo   = this.add.text(560, 479, '', { fontSize: '12px', fontFamily: 'monospace', color: '#555566' });
     this.txtTurn       = this.add.text(480, 260, '', {
-      fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold',
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
       color: '#ffcc00', stroke: '#000', strokeThickness: 2
     }).setOrigin(0.5);
 
     // Buttons
     this.btnEndTurn = this.add.text(910, 490, 'END TURN', {
-      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
+      fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold',
       backgroundColor: '#551100', padding: { x: 10, y: 5 }, color: '#ffbbaa'
     }).setOrigin(1).setInteractive({ useHandCursor: true });
     this.btnEndTurn.on('pointerdown', () => { if (this.turn === 'player' && !this.gameOver) this.endPlayerTurn(); });
@@ -117,6 +120,24 @@ class BattleScene extends Phaser.Scene {
       backgroundColor: '#222222', padding: { x: 8, y: 5 }, color: '#888888'
     }).setOrigin(1).setVisible(false).setInteractive({ useHandCursor: true });
     this.btnCancel.on('pointerdown', () => this.cancelAttack());
+
+    // ── Battle Log panel ───────────────────────────────────────────────
+    const logBg = this.add.graphics().setDepth(2);
+    logBg.fillStyle(0x06060f, 0.92); logBg.fillRoundedRect(0, 50, 172, 210, 4);
+    logBg.lineStyle(1, 0x222244);    logBg.strokeRoundedRect(0, 50, 172, 210, 4);
+    this.add.text(6, 54, 'BATTLE LOG', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#444466'
+    }).setDepth(3);
+
+    this._logTextObjs = [];
+    const LOG_ROWS = 12;
+    for (let i = 0; i < LOG_ROWS; i++) {
+      this._logTextObjs.push(
+        this.add.text(6, 68 + i * 16, '', {
+          fontSize: '11px', fontFamily: 'monospace', color: '#888899', wordWrap: { width: 160 }
+        }).setDepth(3)
+      );
+    }
 
     // ── Global pointer events ──────────────────────────────────────────
     this.input.on('pointermove', (ptr) => {
@@ -258,8 +279,10 @@ class BattleScene extends Phaser.Scene {
       this.enemyHand.splice(this.enemyHand.indexOf(target), 1);
       if (target.type === 'demon') {
         this.enemyBoard.push({ ...target, currentHp: target.hp, currentAtk: target.atk, exhausted: false });
+        this.addLog('Enemy plays ' + target.name, '#ff8888');
         this.resolveDemonBattlecry(target, 'enemy');
       } else {
+        this.addLog('Enemy casts ' + target.name, '#ffaaaa');
         this.resolveSpell(target, 'enemy');
         this.enemyDiscard.push(target);
       }
@@ -305,8 +328,9 @@ class BattleScene extends Phaser.Scene {
           if (demon.ability && demon.ability.includes('poisonous') && t.currentHp > 0) t.currentHp = 0;
 
           this.showFloat(480, 280, '⚔ ' + demon.name + ' attacks!', '#ff4444');
-          if (demon.currentHp <= 0) this.killFrom(this.enemyBoard,  this.enemyDiscard, demon);
-          if (t.currentHp    <= 0) this.killFrom(this.playerBoard, this.playerDiscard, t);
+          this.addLog(demon.name + ' attacks ' + t.name + ' (' + dmgToT + '/' + dmgToD + ')', '#ff8866');
+          if (demon.currentHp <= 0) { this.addLog(demon.name + ' dies', '#ff4444'); this.killFrom(this.enemyBoard,  this.enemyDiscard, demon); }
+          if (t.currentHp    <= 0) { this.addLog(t.name + ' dies', '#ff6644'); this.killFrom(this.playerBoard, this.playerDiscard, t); }
         } else {
           // Attack face (unblockable or no player demons)
           this.playerLife -= demon.currentAtk;
@@ -314,6 +338,7 @@ class BattleScene extends Phaser.Scene {
             this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
           }
           this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
+          this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
         }
       });
       this.renderAll(); this.updateUI(); this.checkWin();
@@ -359,6 +384,7 @@ class BattleScene extends Phaser.Scene {
     this.playerDeck.splice(insertAt, 0, card);
     this.clearPopup();
     this.showFloat(480, 443, '+' + card.manaValue + ' MANA  (' + card.name + ' pitched to deck)', '#4499ff');
+    this.addLog('You pitch ' + card.name + ' (+' + card.manaValue + ' mana)', '#5599ff');
     this.renderAll(); this.updateUI();
   }
 
@@ -378,8 +404,10 @@ class BattleScene extends Phaser.Scene {
       const demon = { ...card, currentHp: card.hp, currentAtk: card.atk, exhausted: !hasHaste };
       this.playerBoard.push(demon);
       this.showFloat(480, 340, card.name + ' enters the field!', '#ffcc44');
+      this.addLog('You play ' + card.name + ' (' + card.atk + '/' + card.hp + ')', '#ffdd44');
       this.resolveDemonBattlecry(card, 'player');
     } else {
+      this.addLog('You cast ' + card.name, '#aaaaff');
       this.resolveSpell(card, 'player');
       this.playerDiscard.push(card);
     }
@@ -635,6 +663,7 @@ class BattleScene extends Phaser.Scene {
       this.showFloat(340, 460, '+' + demon.currentAtk + ' (Lifesteal)', '#44ff88');
     }
     this.showFloat(760, 80, '⚔ -' + demon.currentAtk, '#ff2222');
+    this.addLog(demon.name + ' hits enemy for ' + demon.currentAtk, '#ffee44');
     this.cancelAttack(); this.updateUI(); this.checkWin();
   }
 
@@ -671,8 +700,9 @@ class BattleScene extends Phaser.Scene {
 
     this.showFloat(700, 150, '⚔ -' + dmgToTarget, '#ff4444');
     this.showFloat(340, 340, '⚔ -' + dmgToDemon, '#ff8888');
-    if (target.currentHp <= 0) this.killFrom(this.enemyBoard,  this.enemyDiscard,  target);
-    if (demon.currentHp  <= 0) this.killFrom(this.playerBoard, this.playerDiscard, demon);
+    this.addLog(demon.name + ' attacks ' + target.name + ' (' + dmgToTarget + '/' + dmgToDemon + ')', '#ffee44');
+    if (target.currentHp <= 0) { this.addLog(target.name + ' dies', '#ff6644'); this.killFrom(this.enemyBoard,  this.enemyDiscard,  target); }
+    if (demon.currentHp  <= 0) { this.addLog(demon.name + ' dies', '#ff8866');  this.killFrom(this.playerBoard, this.playerDiscard, demon); }
     this.cancelAttack(); this.updateUI(); this.checkWin();
   }
 
@@ -758,7 +788,7 @@ class BattleScene extends Phaser.Scene {
     this.hideZoom();
     this._zoomObjs = [];
     const W = 190, H = 270;
-    const px = fromX < 480 ? 880 : 80;
+    const px = fromX < 480 ? Math.min(960 - W/2 - 5, 855) : Math.max(W/2 + 5, 105);
     const py = 280;
 
     const rarityBorder = { common: 0x556655, uncommon: 0x224488, rare: 0xaa4422, legendary: 0xcc8800 };
@@ -769,8 +799,8 @@ class BattleScene extends Phaser.Scene {
     g.strokeRoundedRect(px-W/2, py-H/2, W, H, 10);
     this._zoomObjs.push(g);
 
-    const artImg = this.add.image(px, py - 30, this.artKey(card))
-      .setDisplaySize(140, 110).setDepth(25.05);
+    const artImg = this.add.image(px, py - 38, this.artKey(card))
+      .setDisplaySize(100, 100).setDepth(25.05);
     this._zoomObjs.push(artImg);
 
     const cg = this.add.graphics().setDepth(25.1);
@@ -790,21 +820,21 @@ class BattleScene extends Phaser.Scene {
     );
 
     this._zoomObjs.push(
-      this.add.text(px, py-H/2+10, card.name||'?', {
-        fontSize: '15px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
+      this.add.text(px, py-H/2+8, card.name||'?', {
+        fontSize: '14px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
       }).setOrigin(0.5, 0).setDepth(25.1)
     );
 
     if (card.type === 'demon') {
       this._zoomObjs.push(
-        this.add.text(px, py+44, '⚔  ' + card.atk + '        ❤  ' + card.hp, {
-          fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffcc44'
+        this.add.text(px, py+30, '⚔ ' + card.atk + '    ❤ ' + card.hp, {
+          fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffcc44'
         }).setOrigin(0.5).setDepth(25.1)
       );
     }
     if (card.abilityDesc) {
       this._zoomObjs.push(
-        this.add.text(px, py + (card.type==='demon' ? 72 : 44), card.abilityDesc, {
+        this.add.text(px, py + (card.type==='demon' ? 54 : 34), card.abilityDesc, {
           fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold',
           color: this.abilityColor(card.ability),
           wordWrap: { width: W-20 }, align: 'center'
@@ -813,20 +843,30 @@ class BattleScene extends Phaser.Scene {
     }
 
     this._zoomObjs.push(
-      this.add.text(px, py + (card.type==='demon' ? (card.abilityDesc ? 100 : 74) : (card.abilityDesc ? 66 : 44)), card.desc || '', {
+      this.add.text(px, py + (card.type==='demon' ? (card.abilityDesc ? 78 : 54) : (card.abilityDesc ? 54 : 34)), card.desc || '', {
         fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
         wordWrap: { width: W-24 }, align: 'center'
       }).setOrigin(0.5, 0).setDepth(25.1),
-      this.add.text(px, py+H/2-18, card.rarity.toUpperCase(), {
-        fontSize: '11px', fontFamily: 'monospace',
+      this.add.text(px, py+H/2-10, (card.rarity||'common').toUpperCase(), {
+        fontSize: '10px', fontFamily: 'monospace',
         color: { common:'#888888', uncommon:'#4488ff', rare:'#ff8844', legendary:'#ffaa00' }[card.rarity] || '#888888'
-      }).setOrigin(0.5).setDepth(25.1)
+      }).setOrigin(0.5, 1).setDepth(25.1)
     );
   }
 
   hideZoom() {
     this._zoomObjs.forEach(o => { try { o.destroy(); } catch(e){} });
     this._zoomObjs = [];
+  }
+
+  addLog(msg, color) {
+    this._logLines.push({ msg, color: color || '#aaaacc' });
+    if (this._logLines.length > 12) this._logLines.shift();
+    this._logTextObjs.forEach((t, i) => {
+      const entry = this._logLines[i];
+      if (entry) { t.setText(entry.msg); t.setStyle({ color: entry.color }); }
+      else t.setText('');
+    });
   }
 
   // ═══════════════ RENDERING ════════════════════════════════════════════
@@ -848,9 +888,18 @@ class BattleScene extends Phaser.Scene {
       return;
     }
 
-    const CW = 84, CH = 108, GAP = 5;
+    const HAND_L = 185, HAND_R = 940;
+    const MAX_W = HAND_R - HAND_L;
+    const GAP = 4;
+    let CW = 90, CH = 116;
+    // Shrink cards if hand is too wide to fit
+    const needed = hand.length * CW + (hand.length - 1) * GAP;
+    if (needed > MAX_W) {
+      CW = Math.floor((MAX_W - (hand.length - 1) * GAP) / hand.length);
+      CH = Math.floor(CW * 1.28);
+    }
     const blockW = hand.length * CW + (hand.length-1) * GAP;
-    const sx = 480 - blockW/2;
+    const sx = Math.max(HAND_L, (HAND_L + HAND_R) / 2 - blockW / 2);
 
     hand.forEach((card, i) => {
       const cx = sx + i*(CW+GAP) + CW/2;
@@ -888,34 +937,37 @@ class BattleScene extends Phaser.Scene {
     );
 
     this._handObjs.push(
-      this.add.text(cx, cy-H/2+4, card.name||'?', {
-        fontSize:'8px', fontFamily:'monospace', color:'#dddddd',
-        wordWrap:{width:W-4}, align:'center'
+      this.add.text(cx, cy-H/2+5, card.name||'?', {
+        fontSize:'11px', fontFamily:'monospace', color:'#dddddd',
+        wordWrap:{width:W-6}, align:'center'
       }).setOrigin(0.5,0).setDepth(DEPTH+.2).setAlpha(alpha)
     );
 
-    const artImg = this.add.image(cx, cy - 10, this.artKey(card))
-      .setDisplaySize(W - 10, Math.floor(H * 0.52))
+    // Square art — preserve 64×64 sprite aspect ratio
+    const artSize = Math.min(W - 8, Math.floor(H * 0.48));
+    const artImg = this.add.image(cx, cy - H/2 + 20 + artSize/2, this.artKey(card))
+      .setDisplaySize(artSize, artSize)
       .setDepth(DEPTH + .1).setAlpha(alpha);
     this._handObjs.push(artImg);
 
     const sb = this.add.graphics().setDepth(DEPTH+.1).setAlpha(alpha);
-    sb.fillStyle(0x000000, 0.85); sb.fillRect(cx-W/2, cy+H/2-19, W, 19);
+    sb.fillStyle(0x000000, 0.85); sb.fillRect(cx-W/2, cy+H/2-26, W, 26);
     this._handObjs.push(sb);
 
     const infoLine = card.type==='demon'
       ? '⚔'+(card.atk||0)+'  ❤'+(card.hp||0)
-      : (card.desc||'Spell').substring(0,16);
+      : (card.desc||'Spell').substring(0,18);
     this._handObjs.push(
-      this.add.text(cx, cy+H/2-18, infoLine, {
-        fontSize:'9px', fontFamily:'monospace',
-        color: card.type==='demon' ? '#ffcc44' : '#9999ff'
-      }).setOrigin(0.5).setDepth(DEPTH+.2).setAlpha(alpha)
+      this.add.text(cx, cy+H/2-24, infoLine, {
+        fontSize:'11px', fontFamily:'monospace',
+        color: card.type==='demon' ? '#ffcc44' : '#9999ff',
+        wordWrap:{width:W-4}, align:'center'
+      }).setOrigin(0.5,0).setDepth(DEPTH+.2).setAlpha(alpha)
     );
     if (card.ability) {
       this._handObjs.push(
-        this.add.text(cx, cy+H/2-7, this.abilityTag(card.ability), {
-          fontSize:'7px', fontFamily:'monospace',
+        this.add.text(cx, cy+H/2-11, this.abilityTag(card.ability), {
+          fontSize:'9px', fontFamily:'monospace',
           color: this.abilityColor(card.ability)
         }).setOrigin(0.5).setDepth(DEPTH+.2).setAlpha(alpha)
       );
@@ -989,7 +1041,7 @@ class BattleScene extends Phaser.Scene {
     }
     const CW = 95, CH = 118, GAP = 10;
     const blockW = this.enemyBoard.length*(CW+GAP) - GAP;
-    const sx = 480 - blockW/2;
+    const sx = Math.max(185, 480 - blockW/2);
     this.enemyBoard.forEach((demon, i) => {
       const cx = sx + i*(CW+GAP) + CW/2, cy = 153;
       this.drawBoardDemon(demon, i, cx, cy, CW, CH, true, this._ebObjs);
@@ -1009,47 +1061,55 @@ class BattleScene extends Phaser.Scene {
     g.strokeRoundedRect(cx-W/2, cy-H/2, W, H, 6);
     arr.push(g);
 
-    const artImg = this.add.image(cx, cy - 10, this.artKey(demon))
-      .setDisplaySize(W - 14, Math.floor(H * 0.55))
+    // Square art
+    const bArtSize = Math.min(W - 10, Math.floor(H * 0.5));
+    const artImg = this.add.image(cx, cy - H/2 + 16 + bArtSize/2, this.artKey(demon))
+      .setDisplaySize(bArtSize, bArtSize)
       .setDepth(DEPTH + .1)
       .setAlpha(demon.exhausted ? 0.25 : 1);
     arr.push(artImg);
 
     arr.push(
       this.add.text(cx, cy-H/2+3, demon.name||'?', {
-        fontSize:'8px', fontFamily:'monospace', color:'#cccccc',
+        fontSize:'11px', fontFamily:'monospace', color:'#cccccc',
         wordWrap:{width:W-4}, align:'center'
       }).setOrigin(0.5,0).setDepth(DEPTH+.2)
     );
     if (demon.ability) {
       arr.push(
-        this.add.text(cx, cy-H/2+14, this.abilityTag(demon.ability), {
-          fontSize:'7px', fontFamily:'monospace',
+        this.add.text(cx, cy-H/2+17, this.abilityTag(demon.ability), {
+          fontSize:'9px', fontFamily:'monospace',
           color: this.abilityColor(demon.ability)
         }).setOrigin(0.5,0).setDepth(DEPTH+.2)
       );
     }
 
     const sb = this.add.graphics().setDepth(DEPTH+.1);
-    sb.fillStyle(0x000000, 0.9); sb.fillRect(cx-W/2, cy+H/2-22, W, 22);
+    sb.fillStyle(0x000000, 0.9); sb.fillRect(cx-W/2, cy+H/2-24, W, 24);
     arr.push(sb,
-      this.add.text(cx-W/2+5, cy+H/2-11, '⚔'+demon.currentAtk, {
-        fontSize:'13px', fontFamily:'monospace', color:'#ff8888'
+      this.add.text(cx-W/2+5, cy+H/2-12, '⚔'+demon.currentAtk, {
+        fontSize:'14px', fontFamily:'monospace', color:'#ff8888'
       }).setOrigin(0, 0.5).setDepth(DEPTH+.2),
-      this.add.text(cx+W/2-5, cy+H/2-11, demon.currentHp+'❤', {
-        fontSize:'13px', fontFamily:'monospace', color:'#88ff88'
+      this.add.text(cx+W/2-5, cy+H/2-12, demon.currentHp+'❤', {
+        fontSize:'14px', fontFamily:'monospace', color:'#88ff88'
       }).setOrigin(1, 0.5).setDepth(DEPTH+.2)
     );
 
     if (demon.exhausted) {
-      arr.push(this.add.text(cx, cy-4, '😴', { fontSize:'18px' }).setOrigin(0.5).setDepth(DEPTH+.3));
+      arr.push(this.add.text(cx, cy, 'ZZZ', { fontSize:'14px', fontFamily:'monospace', color:'#666688' }).setOrigin(0.5).setDepth(DEPTH+.3));
     }
-    if (isTarget)   arr.push(this.add.text(cx, cy-H/2-12, '← TARGET',    { fontSize:'9px', fontFamily:'monospace', color:'#ff4444' }).setOrigin(0.5).setDepth(DEPTH+.3));
-    if (isAttacker) arr.push(this.add.text(cx, cy-H/2-12, '← ATTACKING', { fontSize:'9px', fontFamily:'monospace', color:'#ffff44' }).setOrigin(0.5).setDepth(DEPTH+.3));
+    if (isTarget)   arr.push(this.add.text(cx, cy-H/2-14, '← TARGET',    { fontSize:'11px', fontFamily:'monospace', color:'#ff4444' }).setOrigin(0.5).setDepth(DEPTH+.3));
+    if (isAttacker) arr.push(this.add.text(cx, cy-H/2-14, '← ATTACKING', { fontSize:'11px', fontFamily:'monospace', color:'#ffff44' }).setOrigin(0.5).setDepth(DEPTH+.3));
 
     const zone = this.add.zone(cx, cy, W, H).setDepth(DEPTH+.5).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => { g.lineStyle(3,0xffffff); g.strokeRoundedRect(cx-W/2,cy-H/2,W,H,6); });
-    zone.on('pointerout',  () => { g.lineStyle(isTarget||isAttacker?3:2,border); g.strokeRoundedRect(cx-W/2,cy-H/2,W,H,6); });
+    zone.on('pointerover', () => {
+      g.lineStyle(3,0xffffff); g.strokeRoundedRect(cx-W/2,cy-H/2,W,H,6);
+      this.showZoom(demon, cx);
+    });
+    zone.on('pointerout',  () => {
+      g.lineStyle(isTarget||isAttacker?3:2,border); g.strokeRoundedRect(cx-W/2,cy-H/2,W,H,6);
+      this.hideZoom();
+    });
     zone.on('pointerdown', (_p, _lx, _ly, event) => {
       event.stopPropagation();
       if (this.gameOver) return;
