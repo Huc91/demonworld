@@ -256,57 +256,68 @@ class WorldScene extends Phaser.Scene {
   buildEnemies() {
     this.enemyGroup = this.physics.add.group();
 
+    // Difficulty tint colours
+    const TINT = {
+      weak:   0x44ff88,   // green
+      normal: 0x4488ff,   // blue
+      hard:   0xff3322,   // red
+    };
+
+    // ei: index into window.ENEMIES  (0-2 weak, 3-5 normal, 6-8 hard, 9-11 boss)
     const E = window.ENEMIES;
     const spawns = [
-      // — Wilderness (north, easy) —
+      // — Wilderness (weak) —
       { x: 15*32, y: 15*32, ei: 0 }, { x: 22*32, y: 8*32,  ei: 0 },
       { x: 8*32,  y: 7*32,  ei: 0 }, { x: 25*32, y: 14*32, ei: 1 },
-      { x: 12*32, y: 20*32, ei: 1 }, { x: 20*32, y: 25*32, ei: 2 },
-      { x: 8*32,  y: 28*32, ei: 1 }, { x: 18*32, y: 18*32, ei: 0 },
-      // — Near first river (medium) —
-      { x: 28*32, y: 30*32, ei: 2 }, { x: 26*32, y: 38*32, ei: 2 },
-      { x: 28*32, y: 55*32, ei: 3 }, { x: 27*32, y: 65*32, ei: 3 },
-      // — East road (medium) —
-      { x: 90*32, y: 55*32, ei: 3 }, { x: 95*32, y: 58*32, ei: 3 },
-      { x: 100*32, y: 52*32, ei: 4 },
+      { x: 12*32, y: 20*32, ei: 1 }, { x: 18*32, y: 18*32, ei: 0 },
+      { x: 8*32,  y: 28*32, ei: 2 }, { x: 20*32, y: 25*32, ei: 2 },
+      // — Near first river (normal) —
+      { x: 28*32, y: 30*32, ei: 3 }, { x: 26*32, y: 38*32, ei: 3 },
+      { x: 28*32, y: 55*32, ei: 4 }, { x: 27*32, y: 65*32, ei: 4 },
+      // — East road (normal) —
+      { x: 90*32, y: 55*32, ei: 3 }, { x: 95*32, y: 58*32, ei: 4 },
+      { x: 100*32, y: 52*32, ei: 5 },
+      // — Second village outskirts (normal) —
+      { x: 86*32, y: 30*32, ei: 4 }, { x: 93*32, y: 25*32, ei: 5 },
       // — Dungeon area (hard) —
-      { x: 100*32, y: 10*32, ei: 5 }, { x: 108*32, y: 14*32, ei: 5 },
-      { x: 112*32, y: 8*32,  ei: 6 }, { x: 105*32, y: 18*32, ei: 6 },
-      // — Swamp (medium-hard) —
-      { x: 10*32, y: 78*32, ei: 4 }, { x: 15*32, y: 82*32, ei: 4 },
-      { x: 20*32, y: 76*32, ei: 5 },
+      { x: 100*32, y: 10*32, ei: 6 }, { x: 108*32, y: 14*32, ei: 6 },
+      { x: 112*32, y: 8*32,  ei: 7 }, { x: 105*32, y: 18*32, ei: 7 },
+      // — Swamp (hard) —
+      { x: 10*32, y: 78*32, ei: 6 }, { x: 15*32, y: 82*32, ei: 7 },
+      { x: 20*32, y: 76*32, ei: 8 },
       // — Desert zone (hard) —
-      { x: 115*32, y: 40*32, ei: 5 }, { x: 120*32, y: 45*32, ei: 5 },
-      { x: 130*32, y: 55*32, ei: 6 }, { x: 125*32, y: 65*32, ei: 6 },
-      { x: 140*32, y: 50*32, ei: 6 },
+      { x: 115*32, y: 40*32, ei: 7 }, { x: 120*32, y: 45*32, ei: 8 },
+      { x: 130*32, y: 55*32, ei: 6 }, { x: 125*32, y: 65*32, ei: 8 },
       // — Graveyard (hard) —
-      { x: 80*32, y: 78*32, ei: 6 }, { x: 88*32, y: 82*32, ei: 6 },
-      { x: 84*32, y: 76*32, ei: 5 },
-      // — Second village outskirts (medium) —
-      { x: 86*32, y: 30*32, ei: 3 }, { x: 93*32, y: 25*32, ei: 4 },
+      { x: 80*32, y: 78*32, ei: 8 }, { x: 88*32, y: 82*32, ei: 7 },
+      { x: 84*32, y: 76*32, ei: 6 },
       // — BOSS AREAS (far from start) —
-      { x: 110*32, y: 14*32, ei: 7 },  // Shadow Lord in dungeon
-      { x: 145*32, y: 60*32, ei: 8 },  // Arena Champ in deep desert
-      { x: 85*32,  y: 88*32, ei: 9 },  // Devil King near graveyard
+      { x: 110*32, y: 14*32, ei: 9  },  // Shadow Lord in dungeon
+      { x: 145*32, y: 60*32, ei: 10 },  // Arena Champ in deep desert
+      { x: 85*32,  y: 88*32, ei: 11 },  // Devil King near graveyard
     ];
 
     spawns.forEach(sp => {
       if (sp.x >= this.mapWidth*32 || sp.y >= this.mapHeight*32) return;
       const enemyDef = E[sp.ei];
+      if (!enemyDef) return;
       const sprite = this.physics.add.sprite(sp.x, sp.y, enemyDef.sprite)
         .setDepth(9).setCollideWorldBounds(true);
       sprite.enemyData = enemyDef;
       sprite.wanderTimer = Phaser.Math.Between(500, 2500);
       sprite.body.setSize(22, 22);
-      sprite.setScale(1.3);
 
-      if (enemyDef.isBoss) {
+      const diff = enemyDef.difficulty;
+      if (diff === 'boss') {
         sprite.setScale(1.9);
-        // Pulsing tint effect for bosses
+        // Black-purple pulsing aura for bosses
         this.tweens.add({
-          targets: sprite, tint: { from: 0xff8800, to: 0xff2200 },
-          duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+          targets: sprite, tint: { from: 0x220033, to: 0xaa00ff },
+          duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
+      } else {
+        sprite.setScale(1.3);
+        if (TINT[diff]) sprite.setTint(TINT[diff]);
       }
       this.enemyGroup.add(sprite);
     });

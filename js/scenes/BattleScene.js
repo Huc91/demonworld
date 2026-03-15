@@ -8,7 +8,7 @@ class BattleScene extends Phaser.Scene {
     this.input.mouse.disableContextMenu();
 
     // ── State ──────────────────────────────────────────────────────────
-    this.playerLife  = 10;
+    this.playerLife  = 20;
     this.enemyLife   = this.enemyDef.life || 10;
     this.playerMana  = 0;
     this.turnNumber  = 1;
@@ -510,7 +510,7 @@ class BattleScene extends Phaser.Scene {
         else    { this.playerLife -= card.value; }
         break;
       case 'heal':
-        if (me) { this.playerLife = Math.min(10, this.playerLife + card.value); fx(340, 460, '+' + card.value + ' life', '#44ff44'); }
+        if (me) { this.playerLife = Math.min(20, this.playerLife + card.value); fx(340, 460, '+' + card.value + ' life', '#44ff44'); }
         else    { this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + card.value); }
         break;
       case 'draw':
@@ -556,7 +556,7 @@ class BattleScene extends Phaser.Scene {
       case 'life_per_demon':
         if (me) {
           const g = myBoard.length * card.value;
-          this.playerLife = Math.min(10, this.playerLife + g);
+          this.playerLife = Math.min(20, this.playerLife + g);
           fx(340, 460, '+' + g + ' life', '#44ff44');
         }
         break;
@@ -631,7 +631,7 @@ class BattleScene extends Phaser.Scene {
     this.enemyLife -= demon.currentAtk;
     demon.exhausted = true;
     if (demon.ability && demon.ability.includes('lifesteal')) {
-      this.playerLife = Math.min(10, this.playerLife + demon.currentAtk);
+      this.playerLife = Math.min(20, this.playerLife + demon.currentAtk);
       this.showFloat(340, 460, '+' + demon.currentAtk + ' (Lifesteal)', '#44ff88');
     }
     this.showFloat(760, 80, '⚔ -' + demon.currentAtk, '#ff2222');
@@ -662,7 +662,7 @@ class BattleScene extends Phaser.Scene {
 
     // Lifesteal
     if (demon.ability && demon.ability.includes('lifesteal')) {
-      this.playerLife = Math.min(10, this.playerLife + dmgToTarget);
+      this.playerLife = Math.min(20, this.playerLife + dmgToTarget);
       this.showFloat(340, 460, '+' + dmgToTarget + ' (Lifesteal)', '#44ff88');
     }
 
@@ -1136,7 +1136,7 @@ class BattleScene extends Phaser.Scene {
     this.txtEnemyLife.setText('❤ ' + Math.max(0, this.enemyLife) + ' / ' + this.enemyDef.life);
     this.txtEnemyDeck.setText('Deck: ' + this.enemyDeck.length);
     this.txtEnemyHand.setText('Hand: ' + this.enemyHand.length);
-    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / 10');
+    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / 20');
     this.txtPlayerMana.setText('◆ Mana: ' + this.playerMana);
     this.txtDeckInfo.setText('Deck ' + this.playerDeck.length + '  Hand ' + this.playerHand.length + '  Discard ' + this.playerDiscard.length);
   }
@@ -1144,7 +1144,11 @@ class BattleScene extends Phaser.Scene {
   // ═══════════════ CARD ART KEY ══════════════════════════════════════════
 
   artKey(card) {
-    if (card.type === 'demon') return 'card_art_' + card.id;
+    if (card.type === 'demon') {
+      const key = 'card_art_' + card.id;
+      if (this.textures.exists(key)) return key;
+      return 'card_art_demon_' + (card.rarity || 'common');
+    }
     const dmg  = ['damage','aoe_enemy','aoe_all_hp','aoe_demon_dmg'];
     const heal = ['heal','resurrect','life_per_demon'];
     if (dmg.includes(card.effect))  return 'card_art_spell_damage';

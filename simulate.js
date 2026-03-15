@@ -7,15 +7,15 @@ const CARDS = [
   { id:'demon_018', name:'Dusk Faerie',  type:'demon', cost:1, manaValue:1, atk:1, hp:3, rarity:'rare',      ability:'battlecry_draw_1' },
   { id:'demon_002', name:'Hellhound',    type:'demon', cost:2, manaValue:1, atk:3, hp:2, rarity:'common',    ability:'haste' },
   { id:'demon_004', name:'Shadow Hound', type:'demon', cost:2, manaValue:1, atk:2, hp:2, rarity:'common',    ability:'lifesteal' },
-  { id:'demon_006', name:'Specter',      type:'demon', cost:2, manaValue:1, atk:2, hp:1, rarity:'uncommon',  ability:'unblockable' },
+  { id:'demon_006', name:'Specter',      type:'demon', cost:2, manaValue:1, atk:2, hp:2, rarity:'uncommon',  ability:'unblockable' },
   { id:'demon_007', name:'Succubus',     type:'demon', cost:2, manaValue:1, atk:1, hp:3, rarity:'uncommon',  ability:'battlecry_draw_2' },
   { id:'demon_008', name:'Blood Bat',    type:'demon', cost:2, manaValue:1, atk:2, hp:3, rarity:'common',    ability:'lifesteal' },
   { id:'demon_005', name:'Bone Knight',  type:'demon', cost:3, manaValue:1, atk:3, hp:4, rarity:'common',    ability:'deathrattle_damage_2' },
-  { id:'demon_011', name:'Wraith',       type:'demon', cost:3, manaValue:1, atk:1, hp:7, rarity:'uncommon',  ability:'taunt' },
+  { id:'demon_011', name:'Wraith',       type:'demon', cost:3, manaValue:1, atk:1, hp:5, rarity:'uncommon',  ability:'taunt' },
   { id:'demon_013', name:'Ember Drake',  type:'demon', cost:3, manaValue:1, atk:3, hp:3, rarity:'uncommon',  ability:'battlecry_aoe_1' },
   { id:'demon_014', name:'Sand Ghoul',   type:'demon', cost:3, manaValue:1, atk:4, hp:2, rarity:'common',    ability:'haste' },
   { id:'demon_015', name:'Void Crawler', type:'demon', cost:3, manaValue:1, atk:3, hp:3, rarity:'uncommon',  ability:'unblockable' },
-  { id:'demon_009', name:'Golem',        type:'demon', cost:4, manaValue:1, atk:2, hp:9, rarity:'uncommon',  ability:'taunt' },
+  { id:'demon_009', name:'Golem',        type:'demon', cost:4, manaValue:1, atk:2, hp:5, rarity:'uncommon',  ability:'taunt' },
   { id:'demon_010', name:'Cerberus',     type:'demon', cost:4, manaValue:1, atk:4, hp:2, rarity:'uncommon',  ability:'haste_poisonous' },
   { id:'demon_012', name:'Minotaur',     type:'demon', cost:4, manaValue:1, atk:3, hp:6, rarity:'uncommon',  ability:'rage' },
   { id:'demon_016', name:'Nightmare',    type:'demon', cost:4, manaValue:1, atk:5, hp:4, rarity:'rare',      ability:'battlecry_damage_player_2' },
@@ -41,64 +41,83 @@ const CARDS = [
   { id:'spell_008', name:'Resurrection',    type:'spell', cost:4, manaValue:1, rarity:'uncommon', effect:'resurrect',     value:1 },
   { id:'spell_010', name:'Doom',            type:'spell', cost:4, manaValue:1, rarity:'rare',     effect:'damage',        value:4 },
   { id:'spell_014', name:'Blood Moon',      type:'spell', cost:4, manaValue:1, rarity:'rare',     effect:'buff_atk_all',  value:1 },
-  { id:'spell_017', name:'Final Hour',      type:'spell', cost:4, manaValue:1, rarity:'legendary',effect:'win_condition', value:3 },
+  { id:'spell_017', name:'Final Hour',      type:'spell', cost:4, manaValue:1, rarity:'legendary',effect:'win_condition', value:5 },
 ];
 
 const CARD_MAP = {};
 CARDS.forEach(c => { CARD_MAP[c.id] = c; });
 
 const STARTER_DECK = [
-  'demon_001','demon_001','demon_001',
+  'demon_001','demon_001',
   'demon_003','demon_003',
   'demon_018',
   'demon_002','demon_002',
-  'demon_004','demon_004',
+  'demon_006',
   'demon_008','demon_008',
   'demon_005','demon_005',
+  'demon_013',
+  'demon_015',
+  'demon_012',
   'demon_011',
+  'demon_010',
+  'demon_019',
+  'demon_020',
   'spell_004','spell_004',
   'spell_016','spell_016',
-  'spell_002','spell_002',
   'spell_013','spell_013',
   'spell_001',
   'spell_009',
+  'spell_003',
   'spell_007',
+  'spell_002',
 ];
 
 // Full card pool decks for enemy levels
 const AGGRO_DECK = [
-  'demon_001','demon_001','demon_001','demon_001','demon_001',
+  // Cheap haste/poisonous openers
+  'demon_001','demon_001','demon_001',
+  'demon_003','demon_003',
   'demon_002','demon_002','demon_002',
-  'demon_003','demon_003','demon_003',
-  'demon_014','demon_014','demon_014',
+  // Unblockable — bypass taunt walls
+  'demon_006','demon_006','demon_006',
+  'demon_015','demon_015',
+  // Haste mid threats
+  'demon_014','demon_014',
+  // Big haste finishers
   'demon_010','demon_010',
   'demon_019','demon_019',
-  'spell_016','spell_016','spell_016',
-  'spell_004','spell_004',
+  // Removal + face damage spells
   'spell_013','spell_013',
   'spell_001','spell_001',
-  'demon_016','demon_016',
-  'demon_023',
+  'spell_010',
+  'spell_004','spell_004',
+  'spell_016',
+  'spell_003',
 ];
 
 const CONTROL_DECK = [
-  'demon_011','demon_011','demon_011',
-  'demon_009','demon_009',
+  // Taunt walls (reduced from 3+2 to 2+1)
+  'demon_011','demon_011',
+  'demon_009',
+  // Mid-range board presence
   'demon_012','demon_012',
+  'demon_005','demon_005',
+  'demon_017','demon_017',
+  // Big late-game threats
   'demon_021','demon_021',
   'demon_020','demon_020',
   'demon_022',
   'demon_023',
+  // Removal spells
   'spell_003','spell_003',
   'spell_005','spell_005',
-  'spell_010','spell_010',
+  'spell_010',
+  // Utility
   'spell_002','spell_002',
-  'spell_007','spell_007',
-  'spell_011','spell_011',
-  'spell_015','spell_015',
+  'spell_004','spell_004',
+  'spell_007',
   'spell_008',
-  'demon_017',
-  'demon_005',
+  'spell_015',
 ];
 
 function shuffle(arr) {
@@ -202,8 +221,8 @@ function resolveSpell(card, who, state) {
     case 'damage':
       if (me) state.enemyLife -= card.value; else state.playerLife -= card.value; break;
     case 'heal':
-      if (me) state.playerLife = Math.min(10, state.playerLife + card.value);
-      else    state.enemyLife  = Math.min(10, state.enemyLife  + card.value); break;
+      if (me) state.playerLife = Math.min(20, state.playerLife + card.value);
+      else    state.enemyLife  = Math.min(20, state.enemyLife  + card.value); break;
     case 'draw':
       if (me) drawCards(state.pDeck, state.pHand, state.pDiscard, card.value);
       else    for (let i=0;i<card.value;i++) drawCards(state.eDeck, state.eHand, state.eDiscard,1); break;
@@ -236,11 +255,39 @@ function resolveSpell(card, who, state) {
     case 'win_condition':
       if (me && state.enemyLife <= card.value) state.enemyLife = 0; break;
     case 'life_per_demon':
-      if (me) state.playerLife = Math.min(10, state.playerLife + myBoard.length * card.value); break;
+      if (me) state.playerLife = Math.min(20, state.playerLife + myBoard.length * card.value); break;
   }
 }
 
-// Greedy AI: pitch all except best demon, play it, attack
+// AI: find the subset of cards to play that maximizes total mana spent (= most value)
+// Brute-force over 2^n subsets (hand size ≤ 8 → ≤ 256 combos, fast enough)
+function selectPlays(hand, boardSize) {
+  const n = hand.length;
+  let bestPlay = [];
+  let bestScore = -1;
+
+  for (let mask = 0; mask < (1 << n); mask++) {
+    const toPlay = [];
+    let demonCount = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        if (hand[i].type === 'demon') demonCount++;
+        toPlay.push(hand[i]);
+      }
+    }
+    // Board size limit
+    if (boardSize + demonCount > 4) continue;
+    const sacrificed = hand.filter(c => !toPlay.includes(c));
+    const manaAvail = sacrificed.reduce((s,c)=>s+(c.manaValue||1),0);
+    const manaCost  = toPlay.reduce((s,c)=>s+c.cost,0);
+    if (manaAvail >= manaCost) {
+      // Score = total cost played (higher = more value)
+      if (manaCost > bestScore) { bestScore = manaCost; bestPlay = toPlay; }
+    }
+  }
+  return bestPlay;
+}
+
 function aiTurn(who, state) {
   const me = who === 'player';
   const myBoard   = me ? state.pBoard   : state.eBoard;
@@ -256,42 +303,32 @@ function aiTurn(who, state) {
 
   // Refresh exhaustion
   myBoard.forEach(d => d.exhausted = false);
-  let mana = 0;
 
-  // Find best demon to play
-  const totalMana = mana + myHand.reduce((s,c)=>s+(c.manaValue||1),0);
-  let target = myHand
-    .filter(c => c.type==='demon' && c.cost<=totalMana && myBoard.length<4)
-    .sort((a,b) => b.cost - a.cost)[0];
-  if (!target) target = myHand
-    .filter(c => c.type==='spell' && c.cost<=totalMana)
-    .sort((a,b) => b.cost - a.cost)[0];
+  // Select which cards to play this turn
+  const toPlay = selectPlays(myHand, myBoard.length);
 
-  // Pitch everything except target
-  [...myHand].filter(c => c!==target).forEach(c => {
-    mana += c.manaValue || 1;
-    myHand.splice(myHand.indexOf(c),1);
+  // Sacrifice everything not being played
+  [...myHand].filter(c => !toPlay.includes(c)).forEach(c => {
+    myHand.splice(myHand.indexOf(c), 1);
     myDiscard.push(c);
   });
 
-  // Play target
-  if (target && target.cost <= mana) {
-    mana -= target.cost;
-    myHand.splice(myHand.indexOf(target),1);
-    if (target.type === 'demon') {
-      const hasHaste = target.ability && target.ability.includes('haste');
-      myBoard.push({...target, currentHp:target.hp, currentAtk:target.atk, exhausted:!hasHaste});
-      resolveBattlecry(target, who, state);
+  // Play selected cards (demons first, then spells)
+  const playOrder = [...toPlay.filter(c=>c.type==='demon'), ...toPlay.filter(c=>c.type==='spell')];
+  for (const card of playOrder) {
+    myHand.splice(myHand.indexOf(card), 1);
+    if (card.type === 'demon') {
+      const hasHaste = card.ability && card.ability.includes('haste');
+      myBoard.push({...card, currentHp:card.hp, currentAtk:card.atk, exhausted:!hasHaste});
+      resolveBattlecry(card, who, state);
     } else {
-      resolveSpell(target, who, state);
-      myDiscard.push(target);
+      resolveSpell(card, who, state);
+      myDiscard.push(card);
     }
-  } else if (target) {
-    myHand.splice(myHand.indexOf(target),1);
-    myDiscard.push(target);
+    if (state.playerLife <= 0 || state.enemyLife <= 0) break;
   }
 
-  // Discard remaining hand, draw 5
+  // Discard remaining hand (shouldn't be any), draw 5
   myDiscard.push(...myHand);
   myHand.length = 0;
   drawCards(myDeck, myHand, myDiscard, 5);
@@ -314,7 +351,7 @@ function aiTurn(who, state) {
 
       if (demon.ability && demon.ability.includes('rage') && dmgToD > 0)  demon.currentAtk++;
       if (t.ability     && t.ability.includes('rage')     && dmgToT > 0) t.currentAtk++;
-      if (demon.ability && demon.ability.includes('lifesteal')) setMyLife(Math.min(10, myLife() + dmgToT));
+      if (demon.ability && demon.ability.includes('lifesteal')) setMyLife(Math.min(20, myLife() + dmgToT));
       if (demon.ability && demon.ability.includes('poisonous') && t.currentHp > 0) t.currentHp = 0;
 
       if (demon.currentHp <= 0) killDemon(myBoard,  myDiscard, demon, state, who);
@@ -322,7 +359,7 @@ function aiTurn(who, state) {
     } else {
       const dmg = demon.currentAtk;
       setFoeLife(foeLife() - dmg);
-      if (demon.ability && demon.ability.includes('lifesteal')) setMyLife(Math.min(10, myLife() + dmg));
+      if (demon.ability && demon.ability.includes('lifesteal')) setMyLife(Math.min(20, myLife() + dmg));
     }
   });
 }
@@ -330,7 +367,7 @@ function aiTurn(who, state) {
 // ── Run a single battle ─────────────────────────────────────────────────────
 function runBattle(deckA, deckB, aGoesFirst) {
   const state = {
-    playerLife: 10, enemyLife: 10,
+    playerLife: 20, enemyLife: 20,
     playerMana: 0,  enemyMana: 0,
     pBoard: [], eBoard: [],
     pDiscard: [], eDiscard: [],
@@ -404,7 +441,7 @@ console.log('══════════════════════�
 console.log(`\n  Overall: Player wins ${results.player} | Enemy wins ${results.enemy} | Draws ${results.draw}`);
 console.log(`  Win rate Player A (deck1): ${(results.player/N*100).toFixed(1)}%`);
 console.log(`\n  Avg game length: ${avgTurns} turns`);
-console.log(`  Avg life left for winner: ${avgLife}/10`);
+console.log(`  Avg life left for winner: ${avgLife}/20`);
 console.log(`  Short games (≤3 turns): ${shortGames} (${(shortGames/N*100).toFixed(1)}%)`);
 console.log(`  Long games (≥15 turns): ${longGames} (${(longGames/N*100).toFixed(1)}%)`);
 
@@ -425,8 +462,8 @@ console.log('\n  ── Balance flags ──────────────
 const issues = [];
 if (shortGames / N > 0.15) issues.push(`⚠ Too many short games (${(shortGames/N*100).toFixed(0)}% end in ≤3 turns) — aggro is TOO fast`);
 if (longGames  / N > 0.20) issues.push(`⚠ Too many long games (${(longGames/N*100).toFixed(0)}% last ≥15 turns) — control too defensive`);
-if (avgLife > 7) issues.push(`⚠ Winner has too much life left (${avgLife}/10) — games not close enough`);
-if (avgLife < 2) issues.push(`⚠ Games too swingy — winner barely survives (avg ${avgLife}/10 life left)`);
+if (avgLife > 14) issues.push(`⚠ Winner has too much life left (${avgLife}/20) — games not close enough`);
+if (avgLife < 4) issues.push(`⚠ Games too swingy — winner barely survives (avg ${avgLife}/20 life left)`);
 if (stats.starterVsAggro.l / (N/3) > 0.70) issues.push('⚠ Aggro crushes Starter — Starter needs more cheap blockers or removal');
 if (stats.starterVsControl.l / (N/3) > 0.70) issues.push('⚠ Control crushes Starter — add more card draw / late-game to Starter');
 if (stats.aggroVsControl.w / (N/3) > 0.75) issues.push('⚠ Aggro beats Control too easily — Control needs more early taunts');

@@ -44,18 +44,17 @@ window.CARDS = [
     abilityDesc: 'Haste — can attack immediately.',
     desc: 'Bites hard and fast.',
   },
-  // Lifesteal: restores life equal to damage dealt. Reduced stats vs vanilla 3/3.
+  // Vanilla 2-drop: solid 3/3 stats, no special ability.
   {
     id: 'demon_004', name: 'Shadow Hound', type: 'demon',
-    cost: 2, manaValue: 1, atk: 2, hp: 2, rarity: 'common',
-    ability: 'lifesteal',
-    abilityDesc: 'Lifesteal — heals you for damage it deals.',
-    desc: 'Feeds as it fights.',
+    cost: 2, manaValue: 1, atk: 3, hp: 3, rarity: 'common',
+    ability: null, abilityDesc: null,
+    desc: 'A reliable fighter with no tricks.',
   },
   // Unblockable: can attack enemy player directly even if they have demons. Very strong → terrible body.
   {
     id: 'demon_006', name: 'Specter', type: 'demon',
-    cost: 2, manaValue: 1, atk: 2, hp: 1, rarity: 'uncommon',
+    cost: 2, manaValue: 1, atk: 2, hp: 2, rarity: 'uncommon',
     ability: 'unblockable',
     abilityDesc: 'Unblockable — can always attack the enemy directly.',
     desc: 'Slips past any defence.',
@@ -89,7 +88,7 @@ window.CARDS = [
   // Taunt: must be attacked. Giant wall, tiny threat.
   {
     id: 'demon_011', name: 'Wraith', type: 'demon',
-    cost: 3, manaValue: 1, atk: 1, hp: 7, rarity: 'uncommon',
+    cost: 3, manaValue: 1, atk: 1, hp: 5, rarity: 'uncommon',
     ability: 'taunt',
     abilityDesc: 'Taunt — enemies must attack this first.',
     desc: 'Impossible to ignore.',
@@ -102,13 +101,12 @@ window.CARDS = [
     abilityDesc: 'Battlecry: Deal 1 damage to all enemy demons.',
     desc: 'Clears the path as it lands.',
   },
-  // Haste at cost 3: high ATK glass cannon. Below vanilla 4/4 HP.
+  // Vanilla 3-drop: above-curve stats (4/4), no ability.
   {
     id: 'demon_014', name: 'Sand Ghoul', type: 'demon',
-    cost: 3, manaValue: 1, atk: 4, hp: 2, rarity: 'common',
-    ability: 'haste',
-    abilityDesc: 'Haste — can attack immediately.',
-    desc: 'Desert ambush specialist.',
+    cost: 3, manaValue: 1, atk: 4, hp: 4, rarity: 'common',
+    ability: null, abilityDesc: null,
+    desc: 'Big and dumb. Also big.',
   },
   // Unblockable at cost 3: consistent face damage. Average body.
   {
@@ -123,7 +121,7 @@ window.CARDS = [
   // Taunt + big HP wall. Very low ATK — threatens nothing, absorbs everything.
   {
     id: 'demon_009', name: 'Golem', type: 'demon',
-    cost: 4, manaValue: 1, atk: 2, hp: 7, rarity: 'uncommon',
+    cost: 4, manaValue: 1, atk: 2, hp: 5, rarity: 'uncommon',
     ability: 'taunt',
     abilityDesc: 'Taunt — enemies must attack this first.',
     desc: 'Slow but hard to kill.',
@@ -226,30 +224,38 @@ window.CARDS = [
   { id: 'spell_008', name: 'Resurrection',    type: 'spell', cost: 4, manaValue: 1, rarity: 'uncommon',  effect: 'resurrect',     value: 1, desc: 'Return the top card of your discard to hand.' },
   { id: 'spell_010', name: 'Doom',            type: 'spell', cost: 4, manaValue: 1, rarity: 'rare',      effect: 'damage',        value: 4, desc: 'Deal 4 damage to the enemy.' },
   { id: 'spell_014', name: 'Blood Moon',      type: 'spell', cost: 4, manaValue: 1, rarity: 'rare',      effect: 'buff_atk_all',  value: 1, desc: 'All friendly demons gain +1 ATK.' },
-  { id: 'spell_017', name: 'Final Hour',      type: 'spell', cost: 4, manaValue: 1, rarity: 'legendary', effect: 'win_condition', value: 3, desc: 'Win instantly if the enemy has 3 or less life.' },
+  { id: 'spell_017', name: 'Final Hour',      type: 'spell', cost: 4, manaValue: 1, rarity: 'legendary', effect: 'win_condition', value: 5, desc: 'Win instantly if the enemy has 5 or less life.' },
 ];
 
 window.CARD_MAP = {};
 window.CARDS.forEach(c => { window.CARD_MAP[c.id] = c; });
 
 window.STARTER_DECK = [
-  // Cheap aggro
-  'demon_001','demon_001','demon_001',   // 3x Imp (1/1 Haste)
+  // Cheap pressure
+  'demon_001','demon_001',               // 2x Imp (1/1 Haste)
   'demon_003','demon_003',               // 2x Plague Rat (1/1 Poisonous)
   'demon_018',                           // 1x Dusk Faerie (draw)
   // Mid demons
   'demon_002','demon_002',               // 2x Hellhound (3/2 Haste)
-  'demon_004','demon_004',               // 2x Shadow Hound (Lifesteal)
-  'demon_008','demon_008',               // 2x Blood Bat (Lifesteal)
+  'demon_006',                           // 1x Specter (2/1 Unblockable)
+  'demon_008','demon_008',               // 2x Blood Bat (2/3 Lifesteal)
   'demon_005','demon_005',               // 2x Bone Knight (Deathrattle)
-  'demon_011',                           // 1x Wraith (Taunt)
+  'demon_013',                           // 1x Ember Drake (AOE on entry)
+  'demon_015',                           // 1x Void Crawler (3/3 Unblockable)
+  'demon_012',                           // 1x Minotaur (3/6 Rage)
+  'demon_011',                           // 1x Wraith (1/5 Taunt)
+  // Late game threats
+  'demon_010',                           // 1x Cerberus (4/2 Haste+Poisonous)
+  'demon_019',                           // 1x Pit Fiend (4/3 Haste+Lifesteal)
+  'demon_020',                           // 1x Medusa (4/5 Destroy Strongest)
   // Spells
   'spell_004','spell_004',               // 2x Dark Pact (draw 2)
   'spell_016','spell_016',               // 2x Summon Familiar
-  'spell_002','spell_002',               // 2x Heal
-  'spell_013','spell_013',               // 2x Arcane Bolt
-  'spell_001',                           // 1x Fireball
+  'spell_013','spell_013',               // 2x Arcane Bolt (2 dmg)
+  'spell_001',                           // 1x Fireball (3 dmg)
   'spell_009',                           // 1x Mana Surge
+  'spell_003',                           // 1x Soul Drain (destroy)
   'spell_007',                           // 1x Hex
+  'spell_002',                           // 1x Heal
 ];
-// 3+2+1+2+2+2+2+1 + 2+2+2+2+1+1+1 = 30 ✓
+// 2+2+1+2+1+2+2+1+1+1+1+1+1+1 + 2+2+2+1+1+1+1+1 = 30 ✓

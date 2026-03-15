@@ -87,7 +87,11 @@ class MenuScene extends Phaser.Scene {
 
   // ── Card art key helper ────────────────────────────────────────────
   artKey(card) {
-    if (card.type === 'demon') return 'card_art_' + card.id;
+    if (card.type === 'demon') {
+      const key = 'card_art_' + card.id;
+      if (this.textures.exists(key)) return key;
+      return 'card_art_demon_' + (card.rarity || 'common');
+    }
     const dmg  = ['damage','aoe_enemy','aoe_all_hp','aoe_demon_dmg'];
     const heal = ['heal','resurrect','life_per_demon'];
     if (dmg.includes(card.effect))  return 'card_art_spell_damage';
@@ -146,23 +150,34 @@ class MenuScene extends Phaser.Scene {
     g.lineStyle(2, border); g.strokeRoundedRect(cx-W/2, cy-H/2, W, H, 4);
     this._contentObjs.push(g);
 
-    // Card art image instead of colored geometry dot
-    const artImg = this.add.image(cx, cy - 8, this.artKey(card))
-      .setDisplaySize(W - 12, Math.floor(H * 0.5));
+    // Square art — preserve aspect ratio of the 64×64 source sprites
+    const artSize = Math.min(W - 10, Math.floor(H * 0.44));
+    const artImg = this.add.image(cx, cy - H/2 + 14 + artSize/2, this.artKey(card))
+      .setDisplaySize(artSize, artSize);
     this._contentObjs.push(artImg);
 
     this._contentObjs.push(this.add.text(cx, cy-H/2+3, card.name, {
       fontSize: '7px', fontFamily: 'monospace', color: '#cccccc', wordWrap:{width:W-4}, align:'center'
     }).setOrigin(0.5, 0));
 
-    const statLine = card.type === 'demon' ? '⚔' + card.atk + '/❤' + card.hp : card.effect || 'spell';
-    this._contentObjs.push(this.add.text(cx, cy+H/2-18, statLine, {
-      fontSize: '9px', fontFamily: 'monospace', color: card.type === 'demon' ? '#ffcc44' : '#aaaaff'
+    const statLine = card.type === 'demon' ? '⚔' + card.atk + '/❤' + card.hp : card.desc || card.effect || 'spell';
+    this._contentObjs.push(this.add.text(cx, cy+H/2-20, statLine, {
+      fontSize: '8px', fontFamily: 'monospace', color: card.type === 'demon' ? '#ffcc44' : '#aaaaff',
+      wordWrap: { width: W-6 }, align: 'center'
     }).setOrigin(0.5, 0));
 
-    this._contentObjs.push(this.add.text(cx, cy+H/2-6, 'cost ' + card.cost + '  x' + count, {
-      fontSize: '8px', fontFamily: 'monospace', color: '#888888'
-    }).setOrigin(0.5, 0));
+    const abilityLabel = card.abilityDesc
+      ? card.abilityDesc.split('—')[0].trim()
+      : (card.type === 'demon' ? '' : '');
+    if (abilityLabel) {
+      this._contentObjs.push(this.add.text(cx, cy+H/2-9, abilityLabel, {
+        fontSize: '7px', fontFamily: 'monospace', color: '#aaffcc', wordWrap: { width: W-6 }, align: 'center'
+      }).setOrigin(0.5, 0));
+    }
+
+    this._contentObjs.push(this.add.text(cx, cy-H/2+3, 'cost ' + card.cost + '  x' + count, {
+      fontSize: '7px', fontFamily: 'monospace', color: '#666666'
+    }).setOrigin(0, 0).setX(cx - W/2 + 3));
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -245,8 +260,9 @@ class MenuScene extends Phaser.Scene {
       g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
       this._contentObjs.push(g);
 
-      const artImg = this.add.image(cx, cy - 8, this.artKey(card))
-        .setDisplaySize(CW - 10, Math.floor(CH * 0.48))
+      const artSize2 = Math.min(CW - 10, Math.floor(CH * 0.44));
+      const artImg = this.add.image(cx, cy - CH/2 + 14 + artSize2/2, this.artKey(card))
+        .setDisplaySize(artSize2, artSize2)
         .setAlpha(canAdd ? 1 : 0.35);
       this._contentObjs.push(artImg);
 
@@ -255,12 +271,24 @@ class MenuScene extends Phaser.Scene {
         wordWrap: { width: CW-4 }, align: 'center'
       }).setOrigin(0.5, 0));
 
-      this._contentObjs.push(this.add.text(cx, cy+CH/2-22, 'cost ' + card.cost, {
-        fontSize: '8px', fontFamily: 'monospace', color: canAdd ? '#888888' : '#333333'
+      const deckStatLine = card.type === 'demon'
+        ? '⚔' + card.atk + '/❤' + card.hp + '  cost ' + card.cost
+        : 'cost ' + card.cost + ' — ' + (card.desc || card.effect || 'spell');
+      this._contentObjs.push(this.add.text(cx, cy+CH/2-22, deckStatLine, {
+        fontSize: '7px', fontFamily: 'monospace', color: canAdd ? '#ffcc44' : '#444422',
+        wordWrap: { width: CW-4 }, align: 'center'
       }).setOrigin(0.5, 0));
 
-      this._contentObjs.push(this.add.text(cx, cy+CH/2-10, 'in deck: ' + inDeck + '/' + owned, {
-        fontSize: '8px', fontFamily: 'monospace', color: canAdd ? '#44aa44' : '#555555'
+      const deckAbility = card.abilityDesc ? card.abilityDesc.split('—')[0].trim() : '';
+      if (deckAbility) {
+        this._contentObjs.push(this.add.text(cx, cy+CH/2-13, deckAbility, {
+          fontSize: '6px', fontFamily: 'monospace', color: canAdd ? '#aaffcc' : '#225544',
+          wordWrap: { width: CW-4 }, align: 'center'
+        }).setOrigin(0.5, 0));
+      }
+
+      this._contentObjs.push(this.add.text(cx, cy+CH/2-5, 'in deck: ' + inDeck + '/' + owned, {
+        fontSize: '7px', fontFamily: 'monospace', color: canAdd ? '#44aa44' : '#555555'
       }).setOrigin(0.5, 0));
 
       if (canAdd) {
@@ -470,9 +498,10 @@ class MenuScene extends Phaser.Scene {
       frame.setScale(0, 1);
       cardObjs.push(frame);
 
-      // Art image — initially invisible, shown after frame flips
-      const artImg = this.add.image(cx, cy - 40, this.artKey(card))
-        .setDisplaySize(CW - 20, Math.floor(CH * 0.48))
+      // Art image — square to preserve 64×64 sprite aspect ratio
+      const packArtSize = Math.min(CW - 20, Math.floor(CH * 0.42));
+      const artImg = this.add.image(cx, cy - CH/2 + 38 + packArtSize/2, this.artKey(card))
+        .setDisplaySize(packArtSize, packArtSize)
         .setDepth(53)
         .setAlpha(0);
       cardObjs.push(artImg);
@@ -484,11 +513,11 @@ class MenuScene extends Phaser.Scene {
       }).setOrigin(0.5, 0).setDepth(53).setAlpha(0);
       cardObjs.push(nameText);
 
-      // Stats / effect line
+      // Stats line
       const statLine = card.type === 'demon'
         ? '⚔ ' + card.atk + '   ❤ ' + card.hp
         : (card.desc || card.effect || 'Spell');
-      const statsText = this.add.text(cx, cy + 50, statLine, {
+      const statsText = this.add.text(cx, cy + 40, statLine, {
         fontSize: card.type === 'demon' ? '22px' : '13px',
         fontFamily: 'monospace',
         color: card.type === 'demon' ? '#ffcc44' : '#aaaaff',
@@ -496,6 +525,16 @@ class MenuScene extends Phaser.Scene {
         wordWrap: { width: CW - 20 }, align: 'center'
       }).setOrigin(0.5, 0).setDepth(53).setAlpha(0);
       cardObjs.push(statsText);
+
+      // Ability description
+      const abilityText = card.abilityDesc
+        ? this.add.text(cx, cy + 72, card.abilityDesc, {
+            fontSize: '11px', fontFamily: 'monospace',
+            color: '#aaffcc', stroke: '#000', strokeThickness: 2,
+            wordWrap: { width: CW - 20 }, align: 'center'
+          }).setOrigin(0.5, 0).setDepth(53).setAlpha(0)
+        : null;
+      if (abilityText) cardObjs.push(abilityText);
 
       // Rarity label
       const rarText = this.add.text(cx, cy + CH/2 - 28, card.rarity.toUpperCase(), {
@@ -519,7 +558,7 @@ class MenuScene extends Phaser.Scene {
         ease: 'Power2',
         onComplete: () => {
           // Reveal card content after flip
-          [artImg, nameText, statsText, rarText, counterText].forEach(obj => {
+          [artImg, nameText, statsText, abilityText, rarText, counterText].filter(Boolean).forEach(obj => {
             this.tweens.add({ targets: obj, alpha: 1, duration: 150, ease: 'Linear' });
           });
 
