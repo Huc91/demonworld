@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BloodDungeon — Devil Summoner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #050508;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: monospace;
+    }
+    canvas { display: block; image-rendering: pixelated; }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #050508;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #8800cc;
+      font-family: monospace;
+      font-size: 22px;
+      z-index: 999;
+      gap: 16px;
+    }
+    #loading .sub { font-size: 13px; color: #444; }
+    #loading .bar-wrap { width: 260px; height: 6px; background: #1a1a2e; border-radius: 3px; overflow: hidden; }
+    #loading .bar { height: 100%; width: 0%; background: #8800cc; border-radius: 3px; animation: fill 1.2s ease-out forwards; }
+    @keyframes fill { to { width: 100%; } }
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div>DEVIL SUMMONER</div>
+    <div class="sub">loading card world...</div>
+    <div class="bar-wrap"><div class="bar"></div></div>
+  </div>
+
+  <!-- Phaser 3 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"
+          onload="document.getElementById('loading').style.display='none'"
+          onerror="document.getElementById('loading').innerHTML='<span style=color:#f44>Could not load Phaser. Check your internet connection.</span>'">
+  </script>
+
+  <!-- Data -->
+  <script src="js/cards.js"></script>
+  <script src="js/enemies.js"></script>
+
+  <!-- Scenes (order matters — all must be defined before Phaser.Game is created) -->
+  <script src="js/scenes/PreloadScene.js"></script>
+  <script src="js/scenes/HUDScene.js"></script>
+  <script src="js/scenes/WorldScene.js"></script>
+  <script src="js/scenes/BattleScene.js"></script>
+  <script src="js/scenes/MenuScene.js"></script>
+
+  <!-- Boot -->
+  <script src="js/main.js"></script>
+
+</body>
+</html>
