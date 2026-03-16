@@ -2,6 +2,18 @@ class PreloadScene extends Phaser.Scene {
   constructor() { super({ key: 'PreloadScene' }); }
 
   preload() {
+    // ── GBA-quality real assets (all gracefully fall back to procedural art) ──
+    this.load.image('pk_tileset2',
+      'resources/pk_tileset/Game%20Boy%20Advance%20-%20Pokemon%20FireRed%20_%20LeafGreen%20-%20Tilesets%20-%20Tileset%202.png');
+    this.load.image('mw_walls',
+      'resources/mystic_woods_free_2.2/sprites/tilesets/walls/walls.png');
+    for (let i = 1; i <= 10; i++) {
+      this.load.spritesheet('char_' + i,
+        'resources/character-pack-full_version/sprite_split/character_' + i +
+        '/character_' + i + '_frame32x32.png',
+        { frameWidth: 32, frameHeight: 32 });
+    }
+
     // Load unique pixel art for each demon card from Free Mythic Monsters pack
     // (spaces encoded as %20 for reliable URL loading)
     const BASE = 'Free%20Mythic%20Monsters/Free%20Mythic%20Monsters/Transparent/1x%20Size/';
@@ -41,6 +53,7 @@ class PreloadScene extends Phaser.Scene {
     this.makeEnemies();
     this.makeCardArt();
     this.makeUI();
+    this.upgradeToGBAGraphics();
     this.scene.start('WorldScene');
     this.scene.launch('HUDScene');
   }
@@ -680,6 +693,68 @@ class PreloadScene extends Phaser.Scene {
       'xxxxxxxxxxxxxxxxxxxxxxxx',
       'xxxxxxxxxxxxxxxxxxxxxxxx',
     ], { B: '#1155CC', b: '#88CCFF', x: null });
+  }
+
+  // ── GBA GRAPHICS UPGRADE ─────────────────────────────────────────────
+  // Overrides procedural canvas tiles/sprites with real GBA-quality assets.
+  // Every override is guarded — if an asset failed to load, the procedural
+  // fallback from makeTiles()/makeEnemies() etc. is kept as-is.
+
+  upgradeToGBAGraphics() {
+    // ── tile_grass: only tile from the Pokemon FRLG tileset ──────────────
+    if (this.textures.exists('pk_tileset2')) {
+      const pk = this.textures.get('pk_tileset2').getSourceImage();
+      const t = this.textures.get('tile_grass');
+      if (t) {
+        const c = t.context;
+        c.imageSmoothingEnabled = false;
+        c.clearRect(0, 0, t.width, t.height);
+        // 16×16 tile slot at (0,52); skip 1px separator on each edge → sample 14×14 at (1,53)
+        c.drawImage(pk, 1, 53, 14, 14, 0, 0, 32, 32);
+        t.refresh();
+      }
+    }
+
+    // ── Solid color fills for all other tiles ─────────────────────────────
+    // (tileset coords to be refined later — solid colors until then)
+    const solid = (key, color) => {
+      if (!this.textures.exists(key)) return;
+      const t = this.textures.get(key);
+      const c = t.context;
+      c.fillStyle = color;
+      c.fillRect(0, 0, t.width, t.height);
+      t.refresh();
+    };
+    solid('tile_grave_grass', '#1e4a1a');  // dark green
+    solid('tile_sand',        '#b89018');  // dark yellow
+    solid('tile_dirt',        '#5a3010');  // dark brown
+    solid('tile_water',       '#1a3aaa');  // blue
+    solid('tile_floor',       '#909090');  // light grey
+    solid('tile_mountain',    '#4a4848');  // dark brown-grey
+    solid('tile_wall',        '#0d0d0d');  // black
+    // tile_tree: keep the pixel-art canopy drawn in makeTiles()
+
+    // ── Player animations (char_1, 32×32, 3 cols × 4 rows) ───────────────
+    if (this.textures.exists('char_1')) {
+      const mk = (s, e) => this.anims.generateFrameNumbers('char_1', { start: s, end: e });
+      this.anims.create({ key: 'player_walk_down',  frames: mk(0, 2),  frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_walk_left',  frames: mk(3, 5),  frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_walk_right', frames: mk(6, 8),  frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_walk_up',    frames: mk(9, 11), frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_idle', frames: [{ key: 'char_1', frame: 1 }], frameRate: 1, repeat: -1 });
+      window.GBA_PLAYER = 'char_1';
+    }
+
+    // ── Enemy sprites → character pack ────────────────────────────────────
+    for (let i = 0; i < 10; i++) {
+      const charKey = 'char_' + (i + 1);
+      if (!this.textures.exists(charKey)) continue;
+      window.ENEMIES.forEach(e => { if (e.sprite === 'enemy_' + i) e.sprite = charKey; });
+      this.anims.create({ key: charKey + '_walk', frames: this.anims.generateFrameNumbers(charKey, { start: 0, end: 2 }), frameRate: 6, repeat: -1 });
+      this.anims.create({ key: charKey + '_idle', frames: [{ key: charKey, frame: 1 }], frameRate: 1, repeat: -1 });
+    }
+
+    window.ANIMAL_KEYS = []; // animals removed
   }
 
   // ── UI ELEMENTS ───────────────────────────────────────────────────────

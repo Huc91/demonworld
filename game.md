@@ -27,4 +27,15 @@ The world is open world. You go around cities and wilderness (copy maps from pok
 - every card can be played to generate 1 mana, 2mana or 3 mana, depends on the card or be played for his card effect. Mana is used to pay the cost to play cards.
 - you summon demons that have HP and an ATK stats, is like heartstone.
 - you draw 5 cards at the end of turn, not played cards get discarded. you do not automatically draw a card at start of turn, only at end turn redraw 5. 
+- you can summon demon on two rows: 
+in rear or front.
+front: works like now so works like heartstone, demon in front can attack and can be attacked normally.
+rear: demon in rear can't attack, and can be attacked only if the you rear is empty so they are immune from attack until there is a demon in the front. attacking them is optional.
+So when i choose a demon to attack i must:
+Attack a demon in the enemy front if present, if not choose to
+attack to face the enemy or if present i can attack an enemy on the rear. 
+demon in rear do not protect from face damage they are optional to attack. 
+Taunt demon can only be played on the front. 
+- once per turn i can move a demon to the front, or move a demon from the front to the back. only once per turn
+- arsenal mechanic: once per turn i can put a card in the arsenal. it means i put a card on the side so i can play it on a later turns. Only 1 card a time can be in the arsenal, so if there is already a card i can put more. cards in arsenal can't be pitched to make mana. Like Flesh&Blood.
 

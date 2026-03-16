@@ -2,7 +2,7 @@
 
 // ── Global Game State ────────────────────────────────────────────────────────
 window.GameState = {
-  playerMoney:      50,
+  playerMoney:      5000,
   playerDeck:       [...window.STARTER_DECK],   // 30 card IDs
   playerCollection: [...window.STARTER_DECK],   // all owned cards
   bossesDefeated:   [],
