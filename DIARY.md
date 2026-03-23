@@ -166,3 +166,29 @@ Press `M` or `ESC` in the overworld to open the menu. Three tabs:
 - Screen shake added on battle encounter (cameras.main.shake)
 - BattleScene passes enemyDef + bossId in battleWon event
 
+
+---
+
+## 2026-03-23 — Milestone 4: Visual Polish + God Card Ending
+
+### BattleScene: Death Particles
+- Added `_spawnDeathParticles(cx, cy, color)` — 14 circular fragments + central white flash, all tween-animated and auto-destroyed
+- Integrated into `killFrom()` and `killFromPlayer()` — particles spawn at the exact card position before removal
+- Purple burst for player demons, red burst for enemy demons
+- Added `_boardDemonX(board, idx)` helper to calculate card center X from board layout constants
+- Added `_flashScreen(color, alpha)` — full-screen color flash that fades in 280ms
+- Red screen flash when player takes face damage (enemy attacks directly)
+- Gold/orange flash when player's demon attacks enemy face
+- Victory burst on win screen: 20 particles (40 for boss kills) in gold/white/green
+- "BOSS SLAIN!" label instead of "VICTORY!" when killing a boss
+
+### WorldScene: God Card Ending Sequence
+- `_triggerGodCardEnding()` — checks `_godCardShown` flag to prevent double-trigger; pauses physics, dims world to near-black with 1.8s fade
+- `_showGodCardText()` — radiating gold burst lines; staggered text reveal: "YOU FOUND IT." → "R O G E R'S CARD" → "THE GOD CARD" → cryptic quote → "CARD KING" title
+- `_showGodCardChoice()` — two buttons after 5.5s: "REBUILD THE WORLD" (green) and "UNMAKE IT ALL" (red)
+- `_godCardOutcome(choice)` — each choice triggers a unique ending text sequence (rebuild = hope, unmake = cosmic silence); auto-fades to title screen after 9s and clears save
+
+### Architecture Notes
+- Ending sequences use delayedCall chaining instead of complex state machines — clean and easy to iterate
+- `_boardDemonX()` mirrors the render logic so particle position matches card visually even when board is partially filled
+- `_flashScreen()` lives at depth 97, below particles (99) and popups — won't interfere with UI

@@ -455,6 +455,7 @@ class BattleScene extends Phaser.Scene {
             if (demon.ability && demon.ability.includes('lifesteal')) {
               this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
             }
+            this._flashScreen(0xff0000, 0.22);
             this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
             this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
           }
@@ -464,6 +465,7 @@ class BattleScene extends Phaser.Scene {
           if (demon.ability && demon.ability.includes('lifesteal')) {
             this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
           }
+          this._flashScreen(0xff0000, 0.22);
           this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
           this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
         }
@@ -1319,6 +1321,7 @@ class BattleScene extends Phaser.Scene {
     // Try player front then rear
     let i = this.playerFront.indexOf(demon);
     if (i >= 0) {
+      this._spawnDeathParticles(this._boardDemonX(this.playerFront, i), 285, 0x8844ff);
       this.playerFront.splice(i, 1);
       this.resolveDeathrattle(demon, 'player');
       this.playerGraveyard.push(demon);
@@ -1326,6 +1329,7 @@ class BattleScene extends Phaser.Scene {
     }
     i = this.playerRear.indexOf(demon);
     if (i >= 0) {
+      this._spawnDeathParticles(this._boardDemonX(this.playerRear, i), 375, 0x8844ff);
       this.playerRear.splice(i, 1);
       this.resolveDeathrattle(demon, 'player');
       this.playerGraveyard.push(demon);
@@ -1337,11 +1341,73 @@ class BattleScene extends Phaser.Scene {
     if (i >= 0) {
       const isPlayerBoard = (board === this.playerFront || board === this.playerRear);
       const who = isPlayerBoard ? 'player' : 'enemy';
+      // Determine row Y for particles
+      let ry = 285;
+      if (board === this.playerRear)  ry = 375;
+      else if (board === this.enemyFront) ry = 168;
+      else if (board === this.enemyRear)  ry = 78;
+      const color = isPlayerBoard ? 0x8844ff : 0xff2222;
+      this._spawnDeathParticles(this._boardDemonX(board, i), ry, color);
       board.splice(i, 1);
       this.resolveDeathrattle(demon, who);
       discard.push(demon);
       this._resolveDeathTriggers(who);
     }
+  }
+
+  // ── Death particle burst ──────────────────────────────────────────────────
+
+  _boardDemonX(board, idx) {
+    const CW = 88, GAP = 8;
+    const blockW = board.length * (CW + GAP) - GAP;
+    const sx = Math.max(185, 480 - blockW / 2);
+    return sx + idx * (CW + GAP) + CW / 2;
+  }
+
+  _flashScreen(color, alpha) {
+    const flash = this.add.rectangle(480, 320, 960, 640, color, alpha ?? 0.25).setDepth(97);
+    this.tweens.add({
+      targets: flash, alpha: 0,
+      duration: 280, ease: 'Power2',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  _spawnDeathParticles(cx, cy, color) {
+    const COUNT = 14;
+    for (let k = 0; k < COUNT; k++) {
+      const angle  = (k / COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed  = 60 + Math.random() * 80;
+      const vx     = Math.cos(angle) * speed;
+      const vy     = Math.sin(angle) * speed;
+      const r      = 2 + Math.random() * 3;
+      const g = this.add.graphics().setDepth(99);
+      g.fillStyle(color, 0.9);
+      g.fillCircle(0, 0, r);
+      g.x = cx; g.y = cy;
+      this.tweens.add({
+        targets: g,
+        x: cx + vx * 0.55,
+        y: cy + vy * 0.55,
+        alpha: 0,
+        scaleX: 0.2, scaleY: 0.2,
+        duration: 380 + Math.random() * 200,
+        ease: 'Power2',
+        onComplete: () => g.destroy(),
+      });
+    }
+    // Central flash
+    const flash = this.add.graphics().setDepth(98);
+    flash.fillStyle(0xffffff, 0.7);
+    flash.fillCircle(0, 0, 20);
+    flash.x = cx; flash.y = cy;
+    this.tweens.add({
+      targets: flash,
+      alpha: 0, scaleX: 3, scaleY: 3,
+      duration: 220,
+      ease: 'Power3',
+      onComplete: () => flash.destroy(),
+    });
   }
 
   cleanBoard(board, discard) {
@@ -1439,6 +1505,7 @@ class BattleScene extends Phaser.Scene {
     }
 
     this.enemyLife -= demon.currentAtk;
+    this._flashScreen(0xffaa00, 0.18);
     demon.attacksThisTurn = (demon.attacksThisTurn || 0) + 1;
     demon.exhausted = !(demon.ability === 'double_attack' && demon.attacksThisTurn < 2);
     if (demon.ability === 'haste_face_draw' || demon.ability === 'face_damage_draw') {
@@ -2277,10 +2344,38 @@ class BattleScene extends Phaser.Scene {
     if (result === 'win') {
       const money   = Phaser.Math.Between(this.enemyDef.rewardMoney[0], this.enemyDef.rewardMoney[1]);
       const cardDrop = Math.random() < 0.38 && this.enemyDef.rewardCard ? this.enemyDef.rewardCard : null;
+      const isBoss = this.enemyDef.isBoss || this.enemyDef.difficulty === 'boss';
 
-      this.add.text(480, 210, 'VICTORY!', {
+      // Victory particle burst
+      const burstColors = isBoss
+        ? [0xffd700, 0xff4400, 0xffffff, 0xff8800]
+        : [0xffd700, 0xffffff, 0x44ff88];
+      for (let k = 0; k < (isBoss ? 40 : 20); k++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd   = 80 + Math.random() * 160;
+        const col   = burstColors[Math.floor(Math.random() * burstColors.length)];
+        const r     = 2 + Math.random() * 4;
+        const g = this.add.graphics().setDepth(22);
+        g.fillStyle(col, 0.9);
+        g.fillCircle(0, 0, r);
+        g.x = 480; g.y = 320;
+        this.tweens.add({
+          targets: g,
+          x: 480 + Math.cos(angle) * spd,
+          y: 320 + Math.sin(angle) * spd,
+          alpha: 0, scaleX: 0.1, scaleY: 0.1,
+          duration: 500 + Math.random() * 400,
+          ease: 'Power2',
+          onComplete: () => g.destroy(),
+        });
+      }
+
+      const victoryLabel = isBoss ? 'BOSS SLAIN!' : 'VICTORY!';
+      const victoryColor = isBoss ? '#ff8800' : '#ffd700';
+
+      this.add.text(480, 210, victoryLabel, {
         fontSize: '56px', fontFamily: 'monospace', fontStyle: 'bold',
-        color: '#ffd700', stroke: '#000', strokeThickness: 6
+        color: victoryColor, stroke: '#000', strokeThickness: 6
       }).setOrigin(0.5).setDepth(21);
 
       this.add.text(480, 300, '+' + money + 'G' + (cardDrop ? '\n+ ' + window.CARD_MAP[cardDrop].name : ''), {

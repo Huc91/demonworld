@@ -129,6 +129,12 @@ class WorldScene extends Phaser.Scene {
 
       // Auto-save after every battle win
       window.saveGame();
+
+      // God Card check — trigger ending if the player just obtained it
+      if (reward.card === 'god_card' ||
+          window.GameState.playerCollection.includes('god_card')) {
+        this.time.delayedCall(2800, () => this._triggerGodCardEnding());
+      }
     });
 
     this.events.on('battleLost', () => {
@@ -1231,6 +1237,171 @@ class WorldScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => {
       [bg, t1, t2].forEach(o => {
         this.tweens.add({ targets: o, alpha: 0, duration: 600, onComplete: () => o.destroy() });
+      });
+    });
+  }
+
+  // ─────────────────── GOD CARD ENDING ────────────────────────────────────
+
+  _triggerGodCardEnding() {
+    if (this._godCardShown) return;
+    this._godCardShown = true;
+
+    this.physics.pause();
+    this._dialogueActive = true;
+
+    const W = 960, H = 640;
+    const objs = [];
+
+    // Full-screen dark fade
+    const veil = this.add.rectangle(
+      this.cameras.main.scrollX + W/2,
+      this.cameras.main.scrollY + H/2,
+      W, H, 0x000000, 0
+    ).setDepth(300).setOrigin(0.5);
+    objs.push(veil);
+
+    this.tweens.add({
+      targets: veil, alpha: 0.92,
+      duration: 1800, ease: 'Power2',
+      onComplete: () => this._showGodCardText(objs),
+    });
+  }
+
+  _showGodCardText(objs) {
+    const W = 960, H = 640;
+    const ox = this.cameras.main.scrollX;
+    const oy = this.cameras.main.scrollY;
+
+    // Gold star burst effect (simple radiating lines)
+    const burst = this.add.graphics().setDepth(301);
+    const cx = ox + W/2, cy = oy + H/2;
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      burst.lineStyle(1, 0xffd700, 0.6);
+      burst.beginPath();
+      burst.moveTo(cx + Math.cos(a) * 60, cy + Math.sin(a) * 60);
+      burst.lineTo(cx + Math.cos(a) * 260, cy + Math.sin(a) * 260);
+      burst.strokePath();
+    }
+    this.tweens.add({
+      targets: burst, alpha: 0,
+      duration: 3000, ease: 'Power2',
+      onComplete: () => burst.destroy(),
+    });
+    objs.push(burst);
+
+    const lines = [
+      { text: 'YOU FOUND IT.',          delay: 200,  color: '#ffffff', size: '38px', y: oy + 120 },
+      { text: 'R O G E R\'S   C A R D', delay: 900,  color: '#ffd700', size: '52px', y: oy + 188 },
+      { text: '— THE GOD CARD —',       delay: 1800, color: '#cc8800', size: '20px', y: oy + 252 },
+      { text: '',                        delay: 0,    color: '#000',    size: '1px',  y: 0 },
+      { text: '"It is not a card. It is a question."', delay: 2600, color: '#aaaaaa', size: '14px', y: oy + 308 },
+      { text: '"Are you ready for the answer?"',       delay: 3200, color: '#aaaaaa', size: '14px', y: oy + 332 },
+      { text: '',                        delay: 0,    color: '#000',    size: '1px',  y: 0 },
+      { text: 'YOU ARE NOW   C A R D   K I N G', delay: 4200, color: '#ff4444', size: '24px', y: oy + 390 },
+    ];
+
+    lines.filter(l => l.text).forEach(l => {
+      this.time.delayedCall(l.delay, () => {
+        const t = this.add.text(ox + W/2, l.y, l.text, {
+          fontSize: l.size, fontFamily: 'monospace', fontStyle: 'bold',
+          color: l.color, stroke: '#000000', strokeThickness: 4,
+          align: 'center',
+        }).setOrigin(0.5, 0).setDepth(302).setAlpha(0);
+        this.tweens.add({ targets: t, alpha: 1, duration: 700, ease: 'Power2' });
+        objs.push(t);
+      });
+    });
+
+    // Choice buttons after 5.5s
+    this.time.delayedCall(5500, () => this._showGodCardChoice(objs));
+  }
+
+  _showGodCardChoice(objs) {
+    const W = 960, H = 640;
+    const ox = this.cameras.main.scrollX;
+    const oy = this.cameras.main.scrollY;
+
+    const subText = this.add.text(ox + W/2, oy + 454,
+      'Creation trembles. All demons. All cards. Everything — waits for your word.', {
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'italic',
+        color: '#886644', stroke: '#000', strokeThickness: 2, align: 'center',
+      }).setOrigin(0.5, 0).setDepth(302).setAlpha(0);
+    this.tweens.add({ targets: subText, alpha: 1, duration: 600 });
+    objs.push(subText);
+
+    // REBUILD button
+    const btnRebuild = this.add.text(ox + W/2 - 130, oy + 520, '✦  REBUILD THE WORLD', {
+      fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold',
+      backgroundColor: '#001a00', color: '#44ff88',
+      stroke: '#000', strokeThickness: 3,
+      padding: { x: 18, y: 10 },
+    }).setOrigin(0.5, 0).setDepth(302).setAlpha(0).setInteractive({ useHandCursor: true });
+    this.tweens.add({ targets: btnRebuild, alpha: 1, duration: 600, delay: 200 });
+    btnRebuild.on('pointerover', () => btnRebuild.setStyle({ backgroundColor: '#003300', color: '#88ffaa' }));
+    btnRebuild.on('pointerout',  () => btnRebuild.setStyle({ backgroundColor: '#001a00', color: '#44ff88' }));
+    btnRebuild.on('pointerdown', () => this._godCardOutcome('rebuild', objs));
+    objs.push(btnRebuild);
+
+    // UNMAKE button
+    const btnUnmake = this.add.text(ox + W/2 + 130, oy + 520, '☠  UNMAKE IT ALL', {
+      fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold',
+      backgroundColor: '#1a0000', color: '#ff4444',
+      stroke: '#000', strokeThickness: 3,
+      padding: { x: 18, y: 10 },
+    }).setOrigin(0.5, 0).setDepth(302).setAlpha(0).setInteractive({ useHandCursor: true });
+    this.tweens.add({ targets: btnUnmake, alpha: 1, duration: 600, delay: 200 });
+    btnUnmake.on('pointerover', () => btnUnmake.setStyle({ backgroundColor: '#330000', color: '#ff8888' }));
+    btnUnmake.on('pointerout',  () => btnUnmake.setStyle({ backgroundColor: '#1a0000', color: '#ff4444' }));
+    btnUnmake.on('pointerdown', () => this._godCardOutcome('unmake', objs));
+    objs.push(btnUnmake);
+  }
+
+  _godCardOutcome(choice, objs) {
+    objs.forEach(o => { if (o && o.destroy) o.destroy(); });
+    const W = 960, H = 640;
+    const ox = this.cameras.main.scrollX;
+    const oy = this.cameras.main.scrollY;
+
+    const isRebuild = choice === 'rebuild';
+    const bg = this.add.rectangle(ox + W/2, oy + H/2, W, H,
+      isRebuild ? 0x002200 : 0x110000, 0.97).setDepth(310).setOrigin(0.5);
+
+    const msg1 = isRebuild
+      ? 'You close your eyes.'
+      : 'You smile. Just like Roger.';
+    const msg2 = isRebuild
+      ? 'Light floods every shadow. Every demon card stirs — released. The world rebuilds itself, quietly, like a held breath finally exhaled.'
+      : 'The card pulses once. Then silence. The world folds inward, gently, like a book being shut.\nEverything returns to before the first word was spoken.';
+    const msg3 = isRebuild
+      ? '"He who fights may lose. He who does not fight, has already lost."\n— R.D. Roger\n\n...You chose something else.'
+      : '"The answer was always where you started."\n— R.D. Roger\n\n...You understood.';
+    const title = isRebuild ? 'THE WORLD LIVES AGAIN.' : 'THE WORLD REMEMBERS SILENCE.';
+
+    const textObjs = [];
+    [[W/2, 170, msg1,  '22px', '#cccccc'],
+     [W/2, 240, msg2,  '13px', '#aaaaaa'],
+     [W/2, 400, msg3,  '12px', isRebuild ? '#66cc66' : '#cc6666'],
+     [W/2, 530, title, '28px', isRebuild ? '#44ff88' : '#ff4444'],
+    ].forEach(([tx, ty, txt, sz, col], i) => {
+      const t = this.add.text(ox + tx, oy + ty, txt, {
+        fontSize: sz, fontFamily: 'monospace',
+        color: col, stroke: '#000', strokeThickness: 3,
+        align: 'center', wordWrap: { width: 700 },
+      }).setOrigin(0.5, 0).setDepth(311).setAlpha(0);
+      this.time.delayedCall(i * 1200, () => {
+        this.tweens.add({ targets: t, alpha: 1, duration: 800, ease: 'Power2' });
+      });
+      textObjs.push(t);
+    });
+
+    // Return to title after reading
+    this.time.delayedCall(9000, () => {
+      this.cameras.main.fadeOut(2000, 0, 0, 0);
+      this.time.delayedCall(2100, () => {
+        localStorage.removeItem('blooddungeon_save');
+        this.scene.start('TitleScene');
       });
     });
   }
