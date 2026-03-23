@@ -33,17 +33,17 @@ class MenuScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-M',   () => this.closeMenu());
 
     // ── Tabs ──────────────────────────────────────────────────────────
-    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP', 'QUESTS'];
-    const tabW = 175, tabY = 68;
-    const tabStartX = 480 - (tabs.length * tabW + (tabs.length-1)*8) / 2;
+    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP', 'QUESTS', 'STATS'];
+    const tabW = 142, tabY = 68;
+    const tabStartX = 480 - (tabs.length * tabW + (tabs.length-1)*6) / 2;
 
     this.tabBtns = tabs.map((label, i) => {
-      const tx = tabStartX + i * (tabW + 8) + tabW/2;
+      const tx = tabStartX + i * (tabW + 6) + tabW/2;
       const btn = this.add.text(tx, tabY, label, {
-        fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
-        backgroundColor: '#111133', padding: { x: 12, y: 8 }, color: '#888899'
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold',
+        backgroundColor: '#111133', padding: { x: 10, y: 8 }, color: '#888899'
       }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      const keyMap = { 'COLLECTION': 'collection', 'DECK BUILDER': 'deck', 'SHOP': 'shop', 'QUESTS': 'quests' };
+      const keyMap = { 'COLLECTION': 'collection', 'DECK BUILDER': 'deck', 'SHOP': 'shop', 'QUESTS': 'quests', 'STATS': 'stats' };
       const key = keyMap[label] || label.toLowerCase();
       btn.on('pointerdown', () => this.switchTab(key));
       btn.on('pointerover', () => { if (this.activeTab !== key) btn.setStyle({ color: '#ccccff' }); });
@@ -78,6 +78,7 @@ class MenuScene extends Phaser.Scene {
     else if (key === 'deck')  this.buildDeckBuilder();
     else if (key === 'shop')  this.buildShop();
     else if (key === 'quests') this.buildQuests();
+    else if (key === 'stats') this.buildStats();
   }
 
   clearContent() {
@@ -1079,5 +1080,78 @@ class MenuScene extends Phaser.Scene {
 
       y += 74;
     });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // STATS TAB
+  // ════════════════════════════════════════════════════════════════════
+
+  buildStats() {
+    const gs = window.GameState;
+    const add = o => { this._contentObjs.push(o); return o; };
+
+    add(this.add.text(480, 110, 'ADVENTURER DOSSIER', {
+      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#ffd700', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5, 0));
+
+    const lv  = gs.playerLevel  || 1;
+    const xp  = gs.playerXP     || 0;
+    const xpN = lv * 50;
+    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes'];
+
+    const rows = [
+      ['Player Level',         'Lv.' + lv + '  [' + xp + ' / ' + xpN + ' XP]',             '#ffd700'],
+      ['Hearts',               (gs.hearts ?? 3) + ' / ' + (gs.maxHearts ?? 3) + ' max',      '#ff4466'],
+      ['Battle HP',            (20 + Math.floor((lv - 1) * 2)) + ' base HP',                 '#44ff88'],
+      ['Gold',                 gs.playerMoney + 'G',                                           '#ffd700'],
+      ['Total Kills',          (gs.totalKills || 0) + ' enemies slain',                        '#ff8866'],
+      ['Hard / Boss Kills',    (gs.hardKills || 0) + ' hard/boss enemies',                    '#ff4444'],
+      ['Bosses Defeated',      (gs.bossesDefeated?.length || 0) + ' / 9 bosses',              '#ff6600'],
+      ['Chests Opened',        (gs.chestsOpened || 0) + ' chests',                            '#ffdd44'],
+      ['Current Island',       ISLAND_NAMES[gs.currentIsland || 0],                            '#88ccff'],
+      ['Islands Visited',      (gs.visitedIslands || [0]).map(i => ISLAND_NAMES[i]).join(', '),'#aaffaa'],
+      ['Collection Size',      gs.playerCollection.length + ' cards',                          '#cc88ff'],
+      ['Deck Size',            gs.playerDeck.length + ' / 30 cards',                           '#aaddff'],
+      ['Relics Owned',         (gs.relics || []).length + ' relics',                           '#cc88ff'],
+      ['Card Upgrades',        Object.keys(gs.upgradedCards || {}).length + ' cards forged',   '#ff8822'],
+      ['Quests Complete',      (window.QUESTS?.filter(q => gs.questProgress?.[q.id]?.status === 'claimed').length || 0) +
+                               ' / ' + (window.QUESTS?.length || 0),                           '#44cc88'],
+    ];
+
+    let ry = 150;
+    const left = 80, right = 500, rowH = 28;
+
+    rows.forEach(([label, value, color], i) => {
+      const bg = add(this.add.graphics());
+      bg.fillStyle(i % 2 === 0 ? 0x0c0c1e : 0x0a0a18);
+      bg.fillRect(left - 10, ry - 4, 860, rowH - 2);
+
+      add(this.add.text(left, ry, label, {
+        fontSize: '13px', fontFamily: 'monospace', color: '#777788'
+      }));
+      add(this.add.text(right, ry, value, {
+        fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color
+      }));
+      ry += rowH;
+    });
+
+    // Relic list (if any)
+    const ownedRelics = gs.relics || [];
+    if (ownedRelics.length > 0 && window.RELIC_MAP) {
+      ry += 8;
+      add(this.add.text(left, ry, 'ACTIVE RELICS:', {
+        fontSize: '13px', fontFamily: 'monospace', color: '#8844cc', fontStyle: 'bold'
+      }));
+      ry += 20;
+      ownedRelics.forEach(rid => {
+        const relic = window.RELIC_MAP[rid];
+        if (!relic) return;
+        add(this.add.text(left + 10, ry, relic.name + '  —  ' + relic.desc, {
+          fontSize: '11px', fontFamily: 'monospace', color: '#aa66dd'
+        }));
+        ry += 18;
+      });
+    }
   }
 }
