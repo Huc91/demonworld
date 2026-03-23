@@ -46,7 +46,8 @@ class HUDScene extends Phaser.Scene {
     this.minimapBg.lineStyle(1, 0x555555, 1);
     this.minimapBg.strokeRect(750, 46, 204, 154);
 
-    // Canvas for minimap drawing
+    // Canvas for minimap drawing (remove stale texture if HUDScene was restarted)
+    if (this.textures.exists('hud_minimap')) this.textures.remove('hud_minimap');
     this._minimapCanvas = this.textures.createCanvas('hud_minimap', 200, 150);
     this.minimapImg = this.add.image(751, 47, 'hud_minimap').setOrigin(0, 0).setDepth(50);
 
