@@ -63,6 +63,11 @@ class WorldScene extends Phaser.Scene {
     this.buildBoat();
     this.buildAnimals();
 
+    // ── Boss proximity warning (shown once per boss per session) ──────────
+    this._bossWarned = new Set();
+
+    // ── Island arrival banner (first time on this island) ────────────────
+    this._showIslandArrival();
 
     // Restore echo orb if the player died before recovering gold
     if (window.GameState.echoGold > 0 &&
@@ -1654,6 +1659,83 @@ class WorldScene extends Phaser.Scene {
     }
   }
 
+  // ─────────────────── ISLAND ARRIVAL ─────────────────────────────────────
+
+  _showIslandArrival() {
+    const island = window.GameState.currentIsland || 0;
+    if (island === 0) return; // No banner on home island
+
+    const ARRIVAL = [
+      null,
+      { name: 'INFERNO ISLAND', sub: '"The fire remembers. Do you?"', color: '#ff6622', border: 0xff4400 },
+      { name: 'FROST WASTES',   sub: '"The cold shows you what you are."', color: '#88ccff', border: 0x4488ff },
+    ];
+    const info = ARRIVAL[island];
+    if (!info) return;
+
+    this.time.delayedCall(600, () => {
+      const cx = this.cameras.main.scrollX + 480;
+      const cy = this.cameras.main.scrollY + 320;
+      const bg = this.add.graphics().setDepth(250);
+      bg.fillStyle(0x000000, 0.75); bg.fillRect(cx - 400, cy - 50, 800, 100);
+      bg.lineStyle(2, info.border, 0.8); bg.strokeRect(cx - 400, cy - 50, 800, 100);
+
+      const t1 = this.add.text(cx, cy - 14, info.name, {
+        fontSize: '38px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: info.color, stroke: '#000', strokeThickness: 5,
+      }).setOrigin(0.5).setDepth(251).setAlpha(0);
+
+      const t2 = this.add.text(cx, cy + 24, info.sub, {
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'italic',
+        color: '#aaaaaa', stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(251).setAlpha(0);
+
+      this.tweens.add({ targets: [bg, t1, t2], alpha: 1, duration: 400, ease: 'Power2' });
+      this.time.delayedCall(2400, () => {
+        this.tweens.add({
+          targets: [bg, t1, t2], alpha: 0, duration: 600,
+          onComplete: () => { bg.destroy(); t1.destroy(); t2.destroy(); }
+        });
+      });
+    });
+  }
+
+  _showBossWarning(bossSprite) {
+    const spawnId = bossSprite.spawnId || 'boss';
+    if (this._bossWarned.has(spawnId)) return;
+    this._bossWarned.add(spawnId);
+
+    const bossName = bossSprite.enemyData?.name || 'BOSS';
+    const cx = this.cameras.main.scrollX + 480;
+    const cy = this.cameras.main.scrollY + 110;
+
+    const bg = this.add.rectangle(cx, cy, 520, 44, 0x000000, 0.82).setDepth(50);
+    const t1 = this.add.text(cx, cy - 8, '⚠  BOSS APPROACHING', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#ff6666',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(51).setAlpha(0);
+    const t2 = this.add.text(cx, cy + 8, bossName.toUpperCase(), {
+      fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#ff2222', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(51).setAlpha(0);
+
+    this.tweens.add({ targets: [bg, t1, t2], alpha: 1, duration: 250 });
+    this.time.delayedCall(2200, () => {
+      this.tweens.add({
+        targets: [bg, t1, t2], alpha: 0, duration: 500,
+        onComplete: () => { bg.destroy(); t1.destroy(); t2.destroy(); }
+      });
+    });
+
+    // Brief screen flash (red tint)
+    const flash = this.add.rectangle(
+      this.cameras.main.scrollX + 480,
+      this.cameras.main.scrollY + 320,
+      960, 640, 0x440000, 0.35
+    ).setDepth(49);
+    this.time.delayedCall(300, () => flash.destroy());
+  }
+
   // ─────────────────── DEATH / ECHO ───────────────────────────────────────
 
   _triggerDeath() {
@@ -2269,9 +2351,11 @@ class WorldScene extends Phaser.Scene {
 
   _updateWeather(delta) {
     if (!this._weatherGfx || !this.player) return;
-    this._weatherTimer += delta;
+    this._weatherTimer  += delta;
+    this._weatherTotalMs = (this._weatherTotalMs || 0) + delta;
     if (this._weatherTimer < 80) return;  // ~12 fps for weather
     this._weatherTimer = 0;
+    const time = this._weatherTotalMs;
 
     const island = window.GameState.currentIsland || 0;
     const pr = Math.floor(this.player.y / TILE);
@@ -2423,6 +2507,17 @@ class WorldScene extends Phaser.Scene {
         horse.wanderTimer = Phaser.Math.Between(4000, 9000);
       }
     });
+
+    // ── Boss proximity warning ─────────────────────────────────────────────
+    if (this.enemyGroup && !this.battleCooldown && !this._dialogueActive) {
+      this.enemyGroup.getChildren().forEach(e => {
+        if (!e.enemyData?.isBoss) return;
+        const dx = e.x - this.player.x, dy = e.y - this.player.y;
+        if (dx * dx + dy * dy < 180 * 180) {
+          this._showBossWarning(e);
+        }
+      });
+    }
 
     // ── Explored tiles update ─────────────────────────────────────────────
     const pr = Math.floor(this.player.y / TILE);
