@@ -31,6 +31,8 @@ window.resetGameState = function() {
     // Island system
     currentIsland:    0,
     visitedIslands:   [0],
+    // Relics
+    relics:           [],
   };
 };
 
@@ -56,6 +58,7 @@ window.saveGame = function() {
       chestsOpened:   gs.chestsOpened || 0,
       currentIsland:  gs.currentIsland || 0,
       visitedIslands: gs.visitedIslands || [0],
+      relics:         gs.relics || [],
       savedAt:        Date.now(),
     };
     localStorage.setItem('blooddungeon_save', JSON.stringify(data));
@@ -100,6 +103,7 @@ window.loadGame = function() {
     gs.chestsOpened     = data.chestsOpened    ?? 0;
     gs.currentIsland    = data.currentIsland   ?? 0;
     gs.visitedIslands   = data.visitedIslands  ?? [0];
+    gs.relics           = data.relics          ?? [];
     return true;
   } catch(e) {
     console.warn('Load failed:', e);

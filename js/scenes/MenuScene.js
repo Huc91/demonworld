@@ -598,6 +598,94 @@ class MenuScene extends Phaser.Scene {
       }
       this._contentObjs.push(buyBtn);
     });
+
+    // ── Relics section ──────────────────────────────────────────────────────
+    this._contentObjs.push(this.add.text(480, 408, '— RELICS  (permanent passive bonuses) —', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#8866aa',
+      stroke: '#000', strokeThickness: 2
+    }).setOrigin(0.5, 0));
+
+    const relicDivider = this.add.graphics();
+    relicDivider.lineStyle(1, 0x332244);
+    relicDivider.lineBetween(30, 424, 930, 424);
+    this._contentObjs.push(relicDivider);
+
+    const ownedRelics = window.GameState.relics || [];
+    const RCOLS = 3, RW = 270, RH = 80, RGAP = 12;
+    const relicStartX = 480 - (RCOLS * RW + (RCOLS - 1) * RGAP) / 2 + RW / 2;
+    const relicStartY = 435;
+
+    (window.RELICS || []).forEach((relic, i) => {
+      const col = i % RCOLS, row = Math.floor(i / RCOLS);
+      const rx = relicStartX + col * (RW + RGAP);
+      const ry = relicStartY + row * (RH + 8);
+
+      const owned = ownedRelics.includes(relic.id);
+      const canBuy = !owned && window.GameState.playerMoney >= relic.cost;
+
+      const bg = this.add.graphics();
+      bg.fillStyle(owned ? 0x1a0d2e : 0x0d0d1a);
+      bg.fillRoundedRect(rx - RW/2, ry, RW, RH, 6);
+      bg.lineStyle(1, owned ? 0x8844cc : 0x333355);
+      bg.strokeRoundedRect(rx - RW/2, ry, RW, RH, 6);
+      this._contentObjs.push(bg);
+
+      this._contentObjs.push(this.add.text(rx - RW/2 + 8, ry + 8, relic.name, {
+        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: owned ? '#cc88ff' : '#8888aa'
+      }));
+
+      this._contentObjs.push(this.add.text(rx - RW/2 + 8, ry + 26, relic.desc, {
+        fontSize: '9px', fontFamily: 'monospace', color: '#777788',
+        wordWrap: { width: RW - 80 }
+      }));
+
+      if (owned) {
+        this._contentObjs.push(this.add.text(rx + RW/2 - 8, ry + RH/2, 'OWNED', {
+          fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold',
+          color: '#8844cc'
+        }).setOrigin(1, 0.5));
+      } else {
+        this._contentObjs.push(this.add.text(rx + RW/2 - 8, ry + RH/2 - 10, relic.cost + 'G', {
+          fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffd700'
+        }).setOrigin(1, 0.5));
+
+        const btn = this.add.text(rx + RW/2 - 8, ry + RH/2 + 10, canBuy ? '[BUY]' : '---', {
+          fontSize: '11px', fontFamily: 'monospace',
+          color: canBuy ? '#44ff88' : '#444444'
+        }).setOrigin(1, 0.5);
+
+        if (canBuy) {
+          btn.setInteractive({ useHandCursor: true });
+          btn.on('pointerdown', () => this.buyRelic(relic));
+          btn.on('pointerover', () => btn.setStyle({ color: '#88ffaa' }));
+          btn.on('pointerout',  () => btn.setStyle({ color: '#44ff88' }));
+        }
+        this._contentObjs.push(btn);
+      }
+    });
+  }
+
+  buyRelic(relic) {
+    if ((window.GameState.relics || []).includes(relic.id)) return;
+    if (window.GameState.playerMoney < relic.cost) return;
+
+    window.GameState.playerMoney -= relic.cost;
+    if (!window.GameState.relics) window.GameState.relics = [];
+    window.GameState.relics.push(relic.id);
+
+    // Instant effects applied on purchase
+    if (relic.effect.maxHeart) {
+      window.GameState.maxHearts  = (window.GameState.maxHearts  || 3) + relic.effect.maxHeart;
+      window.GameState.hearts     = Math.min(window.GameState.hearts + relic.effect.maxHeart, window.GameState.maxHearts);
+    }
+
+    window.saveGame();
+    this.refreshGold();
+    this.scene.get('HUDScene')?.updateHUD();
+    // Rebuild shop to reflect new owned state
+    this.clearContent();
+    this.buildShop();
   }
 
   openPack(pack) {

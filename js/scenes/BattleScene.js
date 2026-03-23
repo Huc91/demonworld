@@ -8,9 +8,17 @@ class BattleScene extends Phaser.Scene {
     this.input.mouse.disableContextMenu();
 
     // ── State ──────────────────────────────────────────────────────────
-    this.playerLife  = 20;
+    // Apply relic bonuses at battle start
+    const _relics = window.GameState?.relics || [];
+    const _relicBonusHp   = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.bonusHp   || 0), 0);
+    const _relicStartMana = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.startMana || 0), 0);
+    this._relicShieldActive  = _relics.includes('relic_shield');
+    this._relicDemonAtkBonus = _relics.includes('relic_collar') ? 1 : 0;
+    this._relicGoldBonus     = _relics.includes('relic_gold')   ? 1.30 : 1.0;
+
+    this.playerLife  = 20 + _relicBonusHp;
     this.enemyLife   = this.enemyDef.life || 10;
-    this.playerMana  = 0;
+    this.playerMana  = _relicStartMana;
     this.turnNumber  = 1;
     this.turn        = 'player';
     this.gameOver    = false;
@@ -177,6 +185,23 @@ class BattleScene extends Phaser.Scene {
       backgroundColor: '#222222', padding: { x: 8, y: 5 }, color: '#888888'
     }).setOrigin(1).setVisible(false).setInteractive({ useHandCursor: true });
     this.btnCancel.on('pointerdown', () => this.cancelAttack());
+
+    // ── Relic indicators (tiny badges right of graveyard) ──────────────
+    const ownedRelics = window.GameState?.relics || [];
+    if (ownedRelics.length > 0 && window.RELIC_MAP) {
+      ownedRelics.forEach((rid, i) => {
+        const relic = window.RELIC_MAP[rid];
+        if (!relic) return;
+        const rx = 760 + i * 22;
+        const rBadge = this.add.text(rx, 479, relic.icon || '[?]', {
+          fontSize: '10px', fontFamily: 'monospace',
+          backgroundColor: '#1a0d2e', color: '#cc88ff',
+          padding: { x: 3, y: 2 }
+        }).setInteractive({ useHandCursor: false });
+        // Tooltip on hover
+        rBadge.on('pointerover', () => this.showFloat(rx, 470, relic.name, '#cc88ff'));
+      });
+    }
 
     // ── Battle Log panel ───────────────────────────────────────────────
     const LOG_ROWS = 12;
@@ -507,22 +532,28 @@ class BattleScene extends Phaser.Scene {
             if (demon.currentHp <= 0) { this.killFrom(this.enemyFront, this.enemyGraveyard, demon); }
             if (t.currentHp    <= 0) { this.killFromPlayer(t); }
           } else {
-            this.playerLife -= demon.currentAtk;
-            if (demon.ability && demon.ability.includes('lifesteal')) {
-              this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
+            if (this._relicShieldActive) {
+              this._relicShieldActive = false;
+              this.showFloat(340, 460, 'Runed Shield! Hit blocked!', '#8888ff');
+              this.addLog('Runed Shield blocked ' + demon.name + '\'s attack!', '#8888ff');
+            } else {
+              this.playerLife -= demon.currentAtk;
+              if (demon.ability && demon.ability.includes('lifesteal')) {
+                this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
+              }
+              this._flashScreen(0xff0000);
+              this.showFloat(340, 460, '-' + demon.currentAtk + '!', '#ff2222');
+              this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
             }
-            this._flashScreen(0xff0000);
-            this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
-            this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
           }
         } else {
-          // Unblockable — attack face
+          // Unblockable — attack face (shield does NOT block unblockable)
           this.playerLife -= demon.currentAtk;
           if (demon.ability && demon.ability.includes('lifesteal')) {
             this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
           }
           this._flashScreen(0xff0000);
-          this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
+          this.showFloat(340, 460, '-' + demon.currentAtk + ' (UNBLOCKABLE)!', '#ff2222');
           this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
         }
       });
@@ -667,12 +698,14 @@ class BattleScene extends Phaser.Scene {
     if (card.type === 'demon') {
       const hasHaste = card.ability && card.ability.includes('haste');
       const hasDivineShield = card.ability && card.ability.includes('divine_shield');
-      const demon = { ...card, currentHp: card.hp, currentAtk: card.atk, exhausted: !hasHaste, divineShield: hasDivineShield };
+      const atkBonus = this._relicDemonAtkBonus || 0;
+      const demon = { ...card, currentHp: card.hp, currentAtk: card.atk + atkBonus, exhausted: !hasHaste, divineShield: hasDivineShield };
       const row = targetRow === 'rear' ? this.playerRear : this.playerFront;
       row.push(demon);
       const rowLabel = targetRow === 'rear' ? 'rear' : 'front';
-      this.showFloat(480, 285, card.name + ' enters the ' + rowLabel + '!', '#ffcc44');
-      this.addLog('You play ' + card.name + ' to ' + rowLabel + ' (' + card.atk + '/' + card.hp + ')', '#ffdd44');
+      const atkStr = atkBonus > 0 ? ' (+' + atkBonus + ' collar)' : '';
+      this.showFloat(480, 285, card.name + ' enters the ' + rowLabel + '!' + atkStr, '#ffcc44');
+      this.addLog('You play ' + card.name + ' to ' + rowLabel + ' (' + (card.atk + atkBonus) + '/' + card.hp + ')', '#ffdd44');
       this.resolveDemonBattlecry(card, 'player');
     } else {
       this.addLog('You cast ' + card.name, '#aaaaff');
@@ -2395,7 +2428,8 @@ class BattleScene extends Phaser.Scene {
     ov.fillStyle(0x000000, 0.92); ov.fillRect(0,0,960,640);
 
     if (result === 'win') {
-      const money   = Phaser.Math.Between(this.enemyDef.rewardMoney[0], this.enemyDef.rewardMoney[1]);
+      const rawMoney = Phaser.Math.Between(this.enemyDef.rewardMoney[0], this.enemyDef.rewardMoney[1]);
+      const money    = Math.floor(rawMoney * (this._relicGoldBonus || 1.0));
       const cardDrop = Math.random() < 0.38 && this.enemyDef.rewardCard ? this.enemyDef.rewardCard : null;
       const isBoss = this.enemyDef.isBoss || this.enemyDef.difficulty === 'boss';
 
