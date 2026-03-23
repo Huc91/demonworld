@@ -2405,8 +2405,13 @@ class BattleScene extends Phaser.Scene {
         color: '#ff2222', stroke: '#000', strokeThickness: 6
       }).setOrigin(0.5).setDepth(21);
 
-      this.add.text(480, 315, '-10G', {
-        fontSize: '22px', fontFamily: 'monospace', color: '#ff8888'
+      const hearts = window.GameState.hearts ?? 3;
+      const penaltyMsg = hearts <= 1
+        ? 'LAST HEART — gold lost on death!'
+        : '♥ Lost a heart  (' + (hearts - 1) + ' remain)';
+      this.add.text(480, 315, penaltyMsg, {
+        fontSize: '18px', fontFamily: 'monospace', color: '#ff8888',
+        stroke: '#000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(21);
 
       const btn = this.add.text(480, 400, '[ RETREAT ]', {
