@@ -6,6 +6,11 @@ class WorldScene extends Phaser.Scene {
   create() {
     this.battleCooldown = false;
 
+    // ── Ensure HUDScene is running (e.g. after island travel) ─────────────
+    if (!this.scene.isActive('HUDScene') && !this.scene.isSleeping('HUDScene')) {
+      this.scene.launch('HUDScene');
+    }
+
     // ── Init GameState extensions ────────────────────────────────────────
     if (window.GameState.hearts      === undefined) window.GameState.hearts      = 3;
     if (window.GameState.maxHearts   === undefined) window.GameState.maxHearts   = 3;
@@ -1208,6 +1213,8 @@ class WorldScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.enemyGroup, (player, enemy) => {
       if (this.battleCooldown || this._dialogueActive) return;
       this.battleCooldown = true;
+      window.GameState.playerX = player.x;
+      window.GameState.playerY = player.y;
       window.GameState.defeatedEnemy = enemy;
       window.GameState.currentEnemy  = enemy.enemyData;
       window.GameState.currentEnemySpawnId = enemy.spawnId || null;

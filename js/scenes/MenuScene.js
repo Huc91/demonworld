@@ -495,9 +495,17 @@ class MenuScene extends Phaser.Scene {
   // ════════════════════════════════════════════════════════════════════
 
   buildShop() {
-    this._contentObjs.push(this.add.text(480, 112, 'SHOP — spend your gold on booster packs!', {
+    const currentIsland = window.GameState?.currentIsland || 0;
+    const islandLabel = currentIsland === 1 ? 'INFERNO ISLAND'
+                      : currentIsland === 2 ? 'FROST WASTES'
+                      : 'Home Island';
+    this._contentObjs.push(this.add.text(480, 112, 'SHOP — ' + islandLabel, {
       fontSize: '14px', fontFamily: 'monospace', color: '#aaaacc'
     }).setOrigin(0.5, 0));
+
+    // Island-specific card pools for specialty packs
+    const INFERNO_CARDS = ['demon_106','demon_107','demon_108','demon_109','demon_110','demon_111','spell_059','spell_061'];
+    const FROST_CARDS   = ['demon_112','demon_113','demon_114','demon_115','demon_116','demon_117','spell_060','spell_061'];
 
     // Slot 0 = premium slot (rare minimum, upgrades to mythic/legendary)
     // Slots 1–4 = standard slots
@@ -531,9 +539,32 @@ class MenuScene extends Phaser.Scene {
       },
     ];
 
+    // Add island-specific pack when on a non-home island
+    if (currentIsland === 1) {
+      packs.push({
+        name: 'Inferno Pack',
+        desc: '5 fire demon cards\nGuaranteed island cards\nExclusive to this island',
+        cost: 120,
+        color: 0x331100,
+        border: 0xff6622,
+        islandPool: INFERNO_CARDS,
+      });
+    } else if (currentIsland === 2) {
+      packs.push({
+        name: 'Frost Pack',
+        desc: '5 ice beast cards\nGuaranteed island cards\nExclusive to this island',
+        cost: 120,
+        color: 0x001133,
+        border: 0x88ccff,
+        islandPool: FROST_CARDS,
+      });
+    }
+
     packs.forEach((pack, i) => {
-      const cx = 200 + i * 240, cy = 270;
-      const W = 170, H = 220;
+      const spacing = packs.length <= 3 ? 240 : 210;
+      const startX = 480 - ((packs.length - 1) * spacing) / 2;
+      const cx = startX + i * spacing, cy = 270;
+      const W = packs.length <= 3 ? 170 : 150, H = 220;
 
       const g = this.add.graphics();
       g.fillStyle(pack.color); g.fillRoundedRect(cx-W/2, cy-H/2, W, H, 8);
@@ -571,18 +602,26 @@ class MenuScene extends Phaser.Scene {
 
   openPack(pack) {
     window.GameState.playerMoney -= pack.cost;
-    // Slot 0: premium guaranteed slot (rare at minimum)
-    // Slots 1–4: standard slots
-    const drawn = [
-      this.rollRarity(pack.premiumSlot),
-      this.rollRarity(pack.standardSlot),
-      this.rollRarity(pack.standardSlot),
-      this.rollRarity(pack.standardSlot),
-      this.rollRarity(pack.standardSlot),
-    ];
+    let drawn;
+    if (pack.islandPool) {
+      // Island specialty pack — draw 5 from the island pool
+      drawn = Array.from({ length: 5 }, () => {
+        const cardId = pack.islandPool[Math.floor(Math.random() * pack.islandPool.length)];
+        return window.CARD_MAP[cardId] || window.CARDS[0];
+      });
+    } else {
+      // Slot 0: premium guaranteed slot (rare at minimum); Slots 1–4: standard slots
+      drawn = [
+        this.rollRarity(pack.premiumSlot),
+        this.rollRarity(pack.standardSlot),
+        this.rollRarity(pack.standardSlot),
+        this.rollRarity(pack.standardSlot),
+        this.rollRarity(pack.standardSlot),
+      ];
+    }
     drawn.forEach(card => window.GameState.playerCollection.push(card.id));
     this.refreshGold();
-    this.scene.get('HUDScene').updateHUD();
+    this.scene.get('HUDScene')?.updateHUD();
     this.showPackOpening(drawn);
   }
 
