@@ -35,6 +35,9 @@ class WorldScene extends Phaser.Scene {
     // ── Echo orb ─────────────────────────────────────────────────────────
     this.echoOrb        = null;
 
+    // ── Dialogue state ────────────────────────────────────────────────────
+    this._dialogueActive = false;
+
     // ── Build world ──────────────────────────────────────────────────────
     this.buildProceduralTextures();
     this.buildMap();
@@ -46,6 +49,8 @@ class WorldScene extends Phaser.Scene {
     this.buildChests();
     this.buildHorses();
     this.buildNPCs();
+    this.buildPoneglyphs();
+    this.buildBoat();
     this.buildAnimals();
 
 
@@ -239,6 +244,72 @@ class WorldScene extends Phaser.Scene {
       ctx.ellipse(16, 26, 4, 3, 0, 0, Math.PI * 2);
       ctx.fill();
       ho.refresh();
+    }
+
+    // ── Poneglyph stone (48×64) ──────────────────────────────────────────
+    if (!this.textures.exists('poneglyph')) {
+      const pg = this.textures.createCanvas('poneglyph', 48, 64);
+      const ctx = pg.getContext();
+      // Stone body
+      ctx.fillStyle = '#3a2a6a';
+      ctx.fillRect(4, 8, 40, 54);
+      ctx.fillStyle = '#2a1a5a';
+      ctx.fillRect(0, 12, 4, 44);
+      ctx.fillRect(44, 12, 4, 44);
+      ctx.fillRect(4, 8, 40, 4);
+      // Top rounded
+      ctx.beginPath();
+      ctx.arc(24, 12, 20, Math.PI, 0);
+      ctx.fillStyle = '#3a2a6a';
+      ctx.fill();
+      // Glow lines (inscription marks)
+      ctx.fillStyle = '#8866ff';
+      [[12,20,24,4],[12,28,24,4],[12,36,24,4],[12,44,24,4],
+       [12,52,10,4],[24,52,10,4],
+       [18,16,8,2],[24,16,8,2]].forEach(([x,y,w,h]) => {
+        ctx.fillRect(x, y, w, h);
+      });
+      // Small symbols
+      ctx.fillStyle = '#aaaaff';
+      ctx.fillRect(16, 18, 4, 4);
+      ctx.fillRect(28, 26, 4, 4);
+      ctx.fillRect(20, 34, 4, 4);
+      pg.refresh();
+    }
+
+    // ── Boat sprite (64×48) ──────────────────────────────────────────────
+    if (!this.textures.exists('boat')) {
+      const bt = this.textures.createCanvas('boat', 64, 48);
+      const ctx = bt.getContext();
+      // Hull
+      ctx.fillStyle = '#5a3010';
+      ctx.fillRect(4, 28, 56, 16);
+      ctx.fillStyle = '#7a4a20';
+      ctx.fillRect(4, 24, 56, 8);
+      // Bow/stern curves
+      ctx.fillStyle = '#5a3010';
+      ctx.beginPath();
+      ctx.ellipse(8, 36, 6, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(56, 36, 6, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Mast
+      ctx.fillStyle = '#4a2808';
+      ctx.fillRect(30, 4, 4, 24);
+      // Sail
+      ctx.fillStyle = '#eeeecc';
+      ctx.beginPath();
+      ctx.moveTo(34, 6);
+      ctx.lineTo(48, 14);
+      ctx.lineTo(34, 22);
+      ctx.fill();
+      // Rope lines
+      ctx.strokeStyle = '#6b4010';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(32, 6); ctx.lineTo(10, 24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(32, 6); ctx.lineTo(54, 24); ctx.stroke();
+      bt.refresh();
     }
 
     // ── NPC sprite (32×32) ───────────────────────────────────────────────
@@ -527,6 +598,84 @@ class WorldScene extends Phaser.Scene {
     // ── Path: graveyard to east road ─────────────────────────────────────
     for (let c = 170; c < 197; c++) { set(152, c, DIRT); }
 
+    // ════════════════════════════════════════════════════════════════════
+    // WORLD EXPANSION — new areas
+    // ════════════════════════════════════════════════════════════════════
+
+    // ── CRYSTAL CAVERN — far south-east ──────────────────────────────────
+    // A large underground cave system hidden beneath the desert sands.
+    // Interior is FLOOR; walls seal it. Entrance from the east desert road.
+    const CY1 = 156, CY2 = 193, CX1 = 228, CX2 = 308;
+    rect(CY1, CX1, CY2, CX2, FLOOR);
+    for (let r = CY1; r <= CY2; r++) { set(r, CX1, WALL); set(r, CX2, WALL); }
+    for (let c = CX1; c <= CX2; c++) { set(CY1, c, WALL); set(CY2, c, WALL); }
+    // Entrance from north (from desert)
+    set(CY1, 265, FLOOR); set(CY1, 266, FLOOR); set(CY1, 267, FLOOR);
+    for (let r = 148; r < CY1; r++) { set(r, 265, DIRT); set(r, 266, DIRT); }
+    // Internal crystal pillars (blocking columns for visual interest)
+    [[162,240],[162,255],[162,275],[162,290],
+     [168,248],[168,268],[168,285],
+     [174,242],[174,260],[174,278],[174,295],
+     [180,250],[180,270],[180,288],
+     [186,245],[186,265],[186,283],[186,300],
+    ].forEach(([r,c]) => {
+      set(r, c, WALL); set(r, c+1, WALL);
+      set(r+1, c, WALL); set(r+1, c+1, WALL);
+    });
+    // Crystal cavern chambers (open rooms)
+    rect(162, 232, 168, 238, FLOOR);
+    rect(176, 295, 190, 308, FLOOR); set(176, 295, WALL); set(190, 295, WALL);
+    // Boss chamber (deep inside)
+    rect(180, 290, 193, 308, FLOOR);
+
+    // ── EASTERN HARBOR — far east ─────────────────────────────────────────
+    // A harbor cut into the eastern forest border. A boat waits here.
+    // Represents the future island-hopping mechanic (One Piece style).
+    const HY1 = 92, HY2 = 130, HX1 = 285, HX2 = 314;
+    rect(HY1, HX1, HY2, HX2, FLOOR);
+    for (let r = HY1; r <= HY2; r++) { set(r, HX1, WALL); }
+    for (let c = HX1; c <= HX2; c++) { set(HY1, c, WALL); set(HY2, c, WALL); }
+    // Dock area (dirt path into floor)
+    rect(100, HX1, 122, HX1 + 6, DIRT);
+    // Open east wall (faces the "sea")
+    for (let r = HY1 + 1; r < HY2; r++) set(r, HX2, FLOOR);
+    // Harbor path from east desert road
+    for (let c = 196; c < HX1; c++) { set(106, c, DIRT); set(107, c, DIRT); }
+    // Harbor town buildings (small dock village)
+    rect(HY1+2, HX1+2, HY1+14, HX1+18, WALL); set(HY1+14, HX1+10, FLOOR);
+    rect(HY1+2, HX1+22, HY1+14, HX1+36, WALL); set(HY1+14, HX1+30, FLOOR);
+    rect(HY2-16, HX1+2, HY2-4, HX1+18, WALL); set(HY2-16, HX1+10, FLOOR);
+    // Harbor campfire
+    // (handled in buildCampfires — coordinates added there)
+
+    // ── VOLCANO ISLAND PEAK — far north-east wilderness ───────────────────
+    // A mountain peak with ancient ruins and lore stones.
+    rect(7, 240, 30, 290, MOUNTAIN);
+    // Volcanic crater (walk-into area at peak)
+    rect(12, 255, 22, 278, FLOOR);
+    for (let r = 12; r <= 22; r++) { set(r, 255, WALL); set(r, 278, WALL); }
+    for (let c = 255; c <= 278; c++) { set(12, c, WALL); set(22, c, WALL); }
+    // Entrance from south
+    set(22, 264, FLOOR); set(22, 265, FLOOR);
+    for (let r = 28; r < 32; r++) { set(r, 264, DIRT); set(r, 265, DIRT); }
+    // Path from dungeon 1
+    for (let r = 30; r < 43; r++) { set(r, 250, DIRT); }
+    for (let c = 230; c < 252; c++) { set(43, c, DIRT); }
+
+    // ── NEW VILLAGE — deep south (beyond river) ───────────────────────────
+    // Port town of the south. Connected via long south road.
+    const V4Y1 = 165, V4Y2 = 193, V4X1 = 200, V4X2 = 228;
+    rect(V4Y1, V4X1, V4Y2, V4X2, FLOOR);
+    for (let r = V4Y1; r <= V4Y2; r++) { set(r, V4X1, WALL); set(r, V4X2, WALL); }
+    for (let c = V4X1; c <= V4X2; c++) { set(V4Y1, c, WALL); set(V4Y2, c, WALL); }
+    set(V4Y1, 213, FLOOR); set(V4Y1, 214, FLOOR);
+    // Village 4 buildings
+    rect(168, 203, 178, 213, WALL); set(178, 208, FLOOR);
+    rect(168, 217, 178, 227, WALL); set(178, 222, FLOOR);
+    rect(181, 203, 191, 213, WALL); set(181, 208, FLOOR);
+    // Path to village 4 from graveyard area
+    for (let r = 152; r < V4Y1; r++) { set(r, 213, DIRT); set(r, 214, DIRT); }
+
     // ── Render tiles ─────────────────────────────────────────────────────
     const tileKeys = [
       'tile_grass', 'tile_dirt', 'tile_water', 'tile_wall', 'tile_floor',
@@ -628,12 +777,33 @@ class WorldScene extends Phaser.Scene {
       // Dungeon 2
       { x:  22*TILE, y:  10*TILE, ei: 6 }, { x:  38*TILE, y:   9*TILE, ei: 7 },
 
+      // Crystal Cavern — hard enemies + final boss
+      { x: 240*TILE, y: 165*TILE, ei: 6 }, { x: 258*TILE, y: 170*TILE, ei: 7 },
+      { x: 270*TILE, y: 162*TILE, ei: 8 }, { x: 282*TILE, y: 168*TILE, ei: 6 },
+      { x: 248*TILE, y: 180*TILE, ei: 7 }, { x: 265*TILE, y: 185*TILE, ei: 8 },
+      { x: 280*TILE, y: 178*TILE, ei: 7 }, { x: 295*TILE, y: 184*TILE, ei: 8 },
+
+      // Eastern Harbor — normal to hard
+      { x: 290*TILE, y:  96*TILE, ei: 4 }, { x: 298*TILE, y: 110*TILE, ei: 5 },
+      { x: 290*TILE, y: 120*TILE, ei: 6 },
+
+      // Volcano Peak — hard to boss
+      { x: 263*TILE, y:  15*TILE, ei: 7 }, { x: 272*TILE, y:  16*TILE, ei: 8 },
+      { x: 260*TILE, y:  24*TILE, ei: 8 },
+
+      // Village 4 surroundings — normal
+      { x: 213*TILE, y: 160*TILE, ei: 4 }, { x: 220*TILE, y: 158*TILE, ei: 5 },
+
       // Bosses
       { x: 220*TILE, y:  25*TILE, ei: 9,  spawnId: 'boss_dungeon1'  },
       { x:  30*TILE, y:  11*TILE, ei: 10, spawnId: 'boss_dungeon2'  },
       { x: 290*TILE, y: 120*TILE, ei: 11, spawnId: 'boss_desert'    },
       { x: 170*TILE, y: 174*TILE, ei:  9, spawnId: 'boss_graveyard' },
       { x:  24*TILE, y: 168*TILE, ei: 10, spawnId: 'boss_swamp'     },
+      // Crystal Cavern final boss
+      { x: 298*TILE, y: 188*TILE, ei: 11, spawnId: 'boss_cavern'    },
+      // Volcano Peak boss
+      { x: 265*TILE, y:  17*TILE, ei:  9, spawnId: 'boss_volcano'   },
     ];
 
     spawns.forEach(sp => {
@@ -744,6 +914,12 @@ class WorldScene extends Phaser.Scene {
       { x: 250*32+16, y:  92*32+16 },  // deep desert outpost
       { x:  67*32+16, y:  91*32+16 },  // west river bridge north
       { x:  67*32+16, y: 150*32+16 },  // west river bridge south
+      // NEW AREAS
+      { x: 265*32+16, y: 160*32+16 },  // Crystal Cavern entrance
+      { x: 265*32+16, y: 175*32+16 },  // Crystal Cavern mid
+      { x: 290*32+16, y: 106*32+16 },  // Eastern Harbor
+      { x: 263*32+16, y:  18*32+16 },  // Volcano Peak interior
+      { x: 214*32+16, y: 172*32+16 },  // Village 4 plaza
     ];
 
     positions.forEach(pos => {
@@ -766,9 +942,10 @@ class WorldScene extends Phaser.Scene {
     this.chests = [];
     this._openedChests = new Set();
 
-    const RARE_CARDS = ['demon_019','demon_020','demon_021','demon_022','demon_023'];
+    const RARE_CARDS = ['demon_019','demon_020','demon_021','demon_022','demon_023',
+                        'demon_030','demon_025','demon_036','demon_046','demon_066'];
 
-    // 20 chests scattered in remote locations
+    // Chests scattered across the world including new areas
     const positions = [
       // Dungeon 1 corners
       { x: 192*32+16, y:  10*32+16 }, { x: 228*32+16, y:  10*32+16 },
@@ -789,6 +966,16 @@ class WorldScene extends Phaser.Scene {
       { x: 270*32+16, y:  94*32+16 },
       // Remote north-east wilderness
       { x: 280*32+16, y:  48*32+16 },
+      // NEW: Crystal Cavern
+      { x: 235*32+16, y: 160*32+16 }, { x: 280*32+16, y: 165*32+16 },
+      { x: 260*32+16, y: 182*32+16 }, { x: 298*32+16, y: 175*32+16 },
+      { x: 300*32+16, y: 185*32+16 },
+      // NEW: Eastern Harbor
+      { x: 288*32+16, y:  94*32+16 }, { x: 295*32+16, y: 125*32+16 },
+      // NEW: Volcano Peak
+      { x: 257*32+16, y:  14*32+16 }, { x: 270*32+16, y:  14*32+16 },
+      // NEW: Village 4 area
+      { x: 204*32+16, y: 170*32+16 }, { x: 225*32+16, y: 190*32+16 },
     ];
 
     positions.forEach((pos, idx) => {
@@ -889,6 +1076,80 @@ class WorldScene extends Phaser.Scene {
         });
       },
     });
+  }
+
+  // ─────────────────── PONEGLYPHS ─────────────────────────────────────────
+
+  buildPoneglyphs() {
+    this.poneglyphs = [];
+
+    // 5 poneglyph stones, each with a fragment of the hidden lore
+    const stones = [
+      {
+        tx: 120, ty: 80,    // Just north of main town gate
+        lore: '"Before the First Sealing, there was only one kind of being.\nThey called themselves the First Children.\nThey did not know they were already what they feared becoming."',
+      },
+      {
+        tx: 14, ty: 10,   // Dungeon 2
+        lore: '"The war lasted nine hundred years.\nAt the end, the Council held five cards.\nThe last inscription read: God is not dead. God is contained."',
+      },
+      {
+        tx: 217, ty: 10,  // Dungeon 1 interior
+        lore: '"R.D. Roger visited this stone three times.\nThe third time, he left a message carved beneath ours:\n\'The card knows who deserves it. I am not that person. Yet.\'"',
+      },
+      {
+        tx: 265, ty: 18,  // Volcano Peak
+        lore: '"Here the First Council cast the final vote.\nThe vote was: shall we complete what we are?\nThe answer was: yes.\nFrom that day on, they called themselves humans."',
+      },
+      {
+        tx: 265, ty: 186, // Crystal Cavern deep
+        lore: '"The God Card does not grant power.\nIt grants truth.\nEvery Card King who found it chose the same thing in the end:\nsilence.\nThen they hid it again.\nFor you."',
+      },
+    ];
+
+    stones.forEach((stone, idx) => {
+      const px = stone.tx * TILE + TILE/2;
+      const py = stone.ty * TILE + TILE/2;
+
+      const sprite = this.add.sprite(px, py, 'poneglyph').setDepth(9).setScale(0.9);
+
+      // Pulsing glow tween (blue)
+      this.tweens.add({
+        targets: sprite, alpha: { from: 0.7, to: 1.0 },
+        duration: 2000 + idx * 300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+
+      this.poneglyphs.push({ sprite, px, py, lore: stone.lore, read: false });
+    });
+  }
+
+  // ─────────────────── BOAT ────────────────────────────────────────────────
+
+  buildBoat() {
+    // The boat sits in the Eastern Harbor — a teaser for island travel
+    const bx = 296 * TILE + TILE/2;
+    const by = 110 * TILE + TILE/2;
+
+    this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
+
+    // Gentle bob
+    this.tweens.add({
+      targets: this.boatSprite,
+      y: by + 5,
+      duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+
+    // Harbor master NPC next to boat
+    const npcSprite = this.add.sprite(bx - 40, by - 10, 'npc').setDepth(10).setScale(1.0);
+    this.tweens.add({ targets: npcSprite, y: by - 16, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.add.text(bx - 40, by - 36, 'Harbor Master', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#88ccff',
+      stroke: '#000', strokeThickness: 2,
+      backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+    }).setDepth(11).setOrigin(0.5);
+
+    // Store for interaction
+    this.harborMasterPos = { x: bx - 40, y: by - 10 };
   }
 
   // ─────────────────── ANIMALS ────────────────────────────────────────────
@@ -1010,7 +1271,19 @@ class WorldScene extends Phaser.Scene {
     const px = this.player.x, py = this.player.y;
     const dist = (a, b) => Math.sqrt((a.x - px) ** 2 + (a.y - py) ** 2);
 
-    // Priority 0: NPC dialogue
+    // Priority 0a: Poneglyph lore stones
+    const nearPG = (this.poneglyphs || []).find(pg => Math.sqrt((pg.px - px)**2 + (pg.py - py)**2) < 52);
+    if (nearPG) { this._readPoneglyph(nearPG); return; }
+
+    // Priority 0b: Harbor master
+    if (this.harborMasterPos) {
+      const hm = this.harborMasterPos;
+      if (Math.sqrt((hm.x - px)**2 + (hm.y - py)**2) < 50) {
+        this._showHarborDialogue(); return;
+      }
+    }
+
+    // Priority 0c: NPC dialogue
     const nearNPC = (this.npcs || []).find(n => Math.sqrt((n.px - px)**2 + (n.py - py)**2) < 50);
     if (nearNPC) { this._talkToNPC(nearNPC); return; }
 
@@ -1035,6 +1308,84 @@ class WorldScene extends Phaser.Scene {
     // Priority 4: Campfire
     const nearFire = this.campfires.find(cf => dist(cf) < 44);
     if (nearFire) { this._restAtCampfire(nearFire); return; }
+  }
+
+  // ── Poneglyph reading ────────────────────────────────────────────────────
+
+  _readPoneglyph(pg) {
+    if (this._dialogueActive) return;
+    this._dialogueActive = true;
+
+    // Mark as read (glows white briefly)
+    if (!pg.read) {
+      pg.read = true;
+      this.tweens.add({ targets: pg.sprite, tint: { from: 0x8866ff, to: 0xffffff }, duration: 500, yoyo: true });
+    }
+
+    const cx = this.cameras.main.scrollX + 480;
+    const cy = this.cameras.main.scrollY + 500;
+    const W = 740, H = 110;
+
+    const bg = this.add.graphics().setDepth(300);
+    bg.fillStyle(0x0a001a, 0.96); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    bg.lineStyle(2, 0x6633ff);    bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+
+    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 8, '◈  PONEGLYPH — ANCIENT INSCRIPTION  ◈', {
+      fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: '#8866ff',
+      stroke: '#000', strokeThickness: 2,
+    }).setDepth(301);
+
+    const bodyT = this.add.text(cx - W/2 + 14, cy - H/2 + 26, pg.lore, {
+      fontSize: '11px', fontFamily: 'monospace', color: '#ccccee', fontStyle: 'italic',
+      wordWrap: { width: W - 28 },
+    }).setDepth(301);
+
+    const hint = this.add.text(cx + W/2 - 10, cy + H/2 - 8, '[F] close', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#555566',
+    }).setDepth(301).setOrigin(1, 1);
+
+    const close = () => {
+      [bg, nameT, bodyT, hint].forEach(o => o.destroy());
+      this._dialogueActive = false;
+    };
+
+    this.input.keyboard.once('keydown-F', close);
+    this.time.delayedCall(8000, () => { if (this._dialogueActive) close(); });
+  }
+
+  // ── Harbor Master dialogue ────────────────────────────────────────────────
+
+  _showHarborDialogue() {
+    if (this._dialogueActive) return;
+    this._dialogueActive = true;
+
+    const cx = this.cameras.main.scrollX + 480;
+    const cy = this.cameras.main.scrollY + 500;
+    const W = 680, H = 95;
+    const bg = this.add.graphics().setDepth(300);
+    bg.fillStyle(0x001020, 0.95); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    bg.lineStyle(2, 0x3388cc); bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+
+    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 8, 'Harbor Master Kael', {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#55aaff',
+    }).setDepth(301);
+
+    const msg = '"The sea beyond this harbor leads to islands no one has mapped in twenty years.\nRoger sailed them all. Said each island had its own kind of cards — born from the land itself.\nI\'m refitting the ship. Come back when you\'re stronger. This route is not for the faint of heart."';
+    const bodyT = this.add.text(cx - W/2 + 14, cy - H/2 + 28, msg, {
+      fontSize: '10px', fontFamily: 'monospace', color: '#aaccee',
+      wordWrap: { width: W - 28 }, fontStyle: 'italic',
+    }).setDepth(301);
+
+    const hint = this.add.text(cx + W/2 - 10, cy + H/2 - 8, '[F] close', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#334455',
+    }).setDepth(301).setOrigin(1, 1);
+
+    const close = () => {
+      [bg, nameT, bodyT, hint].forEach(o => o.destroy());
+      this._dialogueActive = false;
+    };
+    this.input.keyboard.once('keydown-F', close);
+    this.time.delayedCall(7000, () => { if (this._dialogueActive) close(); });
   }
 
   // ── NPC dialogue ──────────────────────────────────────────────────────────
