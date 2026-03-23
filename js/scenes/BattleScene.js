@@ -9,12 +9,16 @@ class BattleScene extends Phaser.Scene {
 
     // ── State ──────────────────────────────────────────────────────────
     // Apply relic bonuses at battle start
-    const _relics = window.GameState?.relics || [];
+    // Only EQUIPPED relics (from charm slots) give battle bonuses
+    const _relics = window.GameState?.equippedRelics || [];
     const _relicBonusHp   = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.bonusHp   || 0), 0);
     const _relicStartMana = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.startMana || 0), 0);
     this._relicShieldActive  = _relics.includes('relic_shield');
-    this._relicDemonAtkBonus = _relics.includes('relic_collar') ? 1 : 0;
-    this._relicGoldBonus     = _relics.includes('relic_gold')   ? 1.30 : 1.0;
+    this._relicDemonAtkBonus = _relics.some(id => window.RELIC_MAP?.[id]?.effect?.demonAtkOnPlay) ? 1 : 0;
+    const goldRelicBonus = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.goldBonus || 0), 0);
+    this._relicGoldBonus = 1.0 + goldRelicBonus;
+    // Extra draw on first turn
+    this._relicExtraDraw = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.extraDraw || 0), 0);
 
     const _levelHpBonus = Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2);
     this.playerMaxLife = 20 + _relicBonusHp + _levelHpBonus;
@@ -189,7 +193,7 @@ class BattleScene extends Phaser.Scene {
     this.btnCancel.on('pointerdown', () => this.cancelAttack());
 
     // ── Relic indicators (tiny badges right of graveyard) ──────────────
-    const ownedRelics = window.GameState?.relics || [];
+    const ownedRelics = window.GameState?.equippedRelics || [];
     if (ownedRelics.length > 0 && window.RELIC_MAP) {
       ownedRelics.forEach((rid, i) => {
         const relic = window.RELIC_MAP[rid];
@@ -250,8 +254,8 @@ class BattleScene extends Phaser.Scene {
       this.dismissActionMenu();
     });
 
-    // ── Draw opening hands, then do dice roll ──────────────────────────
-    for (let i = 0; i < 5; i++) this.drawPlayerCards(1);
+    // ── Draw opening hands (+ Scholar Quill bonus), then do dice roll ──
+    for (let i = 0; i < 5 + (this._relicExtraDraw || 0); i++) this.drawPlayerCards(1);
     for (let i = 0; i < 5; i++) this.drawEnemyCard();
     this.updateUI();
     this.renderAll();

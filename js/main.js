@@ -31,8 +31,10 @@ window.resetGameState = function() {
     // Island system
     currentIsland:    0,
     visitedIslands:   [0],
-    // Relics
-    relics:           [],
+    // Relics — Hollow Knight charm system
+    relics:           [],     // owned relic ids (inventory)
+    equippedRelics:   [],     // currently equipped relic ids
+    relicNotches:     4,      // total notch slots
     // Player level
     playerXP:         0,
     playerLevel:      1,
@@ -63,7 +65,9 @@ window.saveGame = function() {
       chestsOpened:   gs.chestsOpened || 0,
       currentIsland:  gs.currentIsland || 0,
       visitedIslands: gs.visitedIslands || [0],
-      relics:         gs.relics || [],
+      relics:         gs.relics          || [],
+      equippedRelics: gs.equippedRelics  || [],
+      relicNotches:   gs.relicNotches    ?? 4,
       playerXP:       gs.playerXP       || 0,
       playerLevel:    gs.playerLevel    || 1,
       upgradedCards:  gs.upgradedCards  || {},
@@ -112,6 +116,8 @@ window.loadGame = function() {
     gs.currentIsland    = data.currentIsland   ?? 0;
     gs.visitedIslands   = data.visitedIslands  ?? [0];
     gs.relics           = data.relics          ?? [];
+    gs.equippedRelics   = data.equippedRelics  ?? [];
+    gs.relicNotches     = data.relicNotches    ?? 4;
     gs.playerXP         = data.playerXP        ?? 0;
     gs.playerLevel      = data.playerLevel      ?? 1;
     gs.upgradedCards    = data.upgradedCards    ?? {};

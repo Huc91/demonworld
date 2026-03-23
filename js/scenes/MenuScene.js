@@ -33,17 +33,18 @@ class MenuScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-M',   () => this.closeMenu());
 
     // ── Tabs ──────────────────────────────────────────────────────────
-    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP', 'QUESTS', 'STATS'];
-    const tabW = 142, tabY = 68;
-    const tabStartX = 480 - (tabs.length * tabW + (tabs.length-1)*6) / 2;
+    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP', 'RELICS', 'QUESTS', 'STATS'];
+    const tabW = 122, tabY = 68;
+    const tabStartX = 480 - (tabs.length * tabW + (tabs.length-1)*5) / 2;
 
     this.tabBtns = tabs.map((label, i) => {
-      const tx = tabStartX + i * (tabW + 6) + tabW/2;
+      const tx = tabStartX + i * (tabW + 5) + tabW/2;
       const btn = this.add.text(tx, tabY, label, {
-        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold',
-        backgroundColor: '#111133', padding: { x: 10, y: 8 }, color: '#888899'
+        fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold',
+        backgroundColor: '#111133', padding: { x: 8, y: 8 }, color: '#888899'
       }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      const keyMap = { 'COLLECTION': 'collection', 'DECK BUILDER': 'deck', 'SHOP': 'shop', 'QUESTS': 'quests', 'STATS': 'stats' };
+      const keyMap = { 'COLLECTION': 'collection', 'DECK BUILDER': 'deck', 'SHOP': 'shop',
+                       'RELICS': 'relics', 'QUESTS': 'quests', 'STATS': 'stats' };
       const key = keyMap[label] || label.toLowerCase();
       btn.on('pointerdown', () => this.switchTab(key));
       btn.on('pointerover', () => { if (this.activeTab !== key) btn.setStyle({ color: '#ccccff' }); });
@@ -77,6 +78,7 @@ class MenuScene extends Phaser.Scene {
     if (key === 'collection') this.buildCollection();
     else if (key === 'deck')  this.buildDeckBuilder();
     else if (key === 'shop')  this.buildShop();
+    else if (key === 'relics') this.buildRelicsTab();
     else if (key === 'quests') this.buildQuests();
     else if (key === 'stats') this.buildStats();
   }
@@ -600,59 +602,68 @@ class MenuScene extends Phaser.Scene {
       this._contentObjs.push(buyBtn);
     });
 
-    // ── Relics section ──────────────────────────────────────────────────────
-    this._contentObjs.push(this.add.text(480, 408, '— RELICS  (permanent passive bonuses) —', {
+    // ── Relics section (shop — buy only, equip in RELICS tab) ─────────────────
+    const relicDivider = this.add.graphics();
+    relicDivider.lineStyle(1, 0x332244);
+    relicDivider.lineBetween(30, 404, 930, 404);
+    this._contentObjs.push(relicDivider);
+
+    this._contentObjs.push(this.add.text(480, 408, '— CHARMS  (equip in the RELICS tab) —', {
       fontSize: '12px', fontFamily: 'monospace', color: '#8866aa',
       stroke: '#000', strokeThickness: 2
     }).setOrigin(0.5, 0));
 
-    const relicDivider = this.add.graphics();
-    relicDivider.lineStyle(1, 0x332244);
-    relicDivider.lineBetween(30, 424, 930, 424);
-    this._contentObjs.push(relicDivider);
-
     const ownedRelics = window.GameState.relics || [];
-    const RCOLS = 3, RW = 270, RH = 80, RGAP = 12;
+    const RCOLS = 4, RW = 210, RH = 68, RGAP = 10;
     const relicStartX = 480 - (RCOLS * RW + (RCOLS - 1) * RGAP) / 2 + RW / 2;
-    const relicStartY = 435;
+    const relicStartY = 428;
 
     (window.RELICS || []).forEach((relic, i) => {
       const col = i % RCOLS, row = Math.floor(i / RCOLS);
       const rx = relicStartX + col * (RW + RGAP);
-      const ry = relicStartY + row * (RH + 8);
+      const ry = relicStartY + row * (RH + 6);
 
       const owned = ownedRelics.includes(relic.id);
       const canBuy = !owned && window.GameState.playerMoney >= relic.cost;
 
+      const notchColor = relic.notches === 1 ? 0x44aa44 : relic.notches === 2 ? 0x4488cc : 0xcc4444;
+
       const bg = this.add.graphics();
       bg.fillStyle(owned ? 0x1a0d2e : 0x0d0d1a);
-      bg.fillRoundedRect(rx - RW/2, ry, RW, RH, 6);
-      bg.lineStyle(1, owned ? 0x8844cc : 0x333355);
-      bg.strokeRoundedRect(rx - RW/2, ry, RW, RH, 6);
+      bg.fillRoundedRect(rx - RW/2, ry, RW, RH, 5);
+      bg.lineStyle(1, owned ? notchColor : 0x222233);
+      bg.strokeRoundedRect(rx - RW/2, ry, RW, RH, 5);
       this._contentObjs.push(bg);
 
-      this._contentObjs.push(this.add.text(rx - RW/2 + 8, ry + 8, relic.name, {
-        fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold',
+      // Notch cost dots
+      for (let n = 0; n < relic.notches; n++) {
+        const ng = this.add.graphics();
+        ng.fillStyle(notchColor, owned ? 1 : 0.4);
+        ng.fillRect(rx - RW/2 + 6 + n * 10, ry + 4, 7, 7);
+        this._contentObjs.push(ng);
+      }
+
+      this._contentObjs.push(this.add.text(rx - RW/2 + 6 + relic.notches * 10 + 4, ry + 4, relic.name, {
+        fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold',
         color: owned ? '#cc88ff' : '#8888aa'
       }));
 
-      this._contentObjs.push(this.add.text(rx - RW/2 + 8, ry + 26, relic.desc, {
-        fontSize: '9px', fontFamily: 'monospace', color: '#777788',
-        wordWrap: { width: RW - 80 }
+      this._contentObjs.push(this.add.text(rx - RW/2 + 6, ry + 20, relic.desc, {
+        fontSize: '8px', fontFamily: 'monospace', color: '#666677',
+        wordWrap: { width: RW - 70 }
       }));
 
       if (owned) {
-        this._contentObjs.push(this.add.text(rx + RW/2 - 8, ry + RH/2, 'OWNED', {
-          fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold',
-          color: '#8844cc'
+        this._contentObjs.push(this.add.text(rx + RW/2 - 6, ry + RH/2, 'IN BAG', {
+          fontSize: '9px', fontFamily: 'monospace', fontStyle: 'bold', color: '#8844cc'
         }).setOrigin(1, 0.5));
       } else {
-        this._contentObjs.push(this.add.text(rx + RW/2 - 8, ry + RH/2 - 10, relic.cost + 'G', {
-          fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffd700'
+        this._contentObjs.push(this.add.text(rx + RW/2 - 6, ry + RH/2 - 9, relic.cost + 'G', {
+          fontSize: '12px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffd700'
         }).setOrigin(1, 0.5));
 
-        const btn = this.add.text(rx + RW/2 - 8, ry + RH/2 + 10, canBuy ? '[BUY]' : '---', {
-          fontSize: '11px', fontFamily: 'monospace',
+        const btn = this.add.text(rx + RW/2 - 6, ry + RH/2 + 9, canBuy ? '[BUY]' : '---', {
+          fontSize: '10px', fontFamily: 'monospace',
           color: canBuy ? '#44ff88' : '#444444'
         }).setOrigin(1, 0.5);
 
@@ -665,6 +676,25 @@ class MenuScene extends Phaser.Scene {
         this._contentObjs.push(btn);
       }
     });
+
+    // Notch upgrade in shop
+    const notchCost = 200;
+    const canBuyNotch = window.GameState.playerMoney >= notchCost;
+    const notchRelicY = relicStartY + Math.ceil((window.RELICS || []).length / RCOLS) * (RH + 6) + 4;
+    this._contentObjs.push(this.add.text(480, notchRelicY, '[ + NOTCH SLOT — ' + notchCost + 'G ]', {
+      fontSize: '12px', fontFamily: 'monospace',
+      color: canBuyNotch ? '#ffdd44' : '#555544'
+    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: canBuyNotch }));
+    if (canBuyNotch) {
+      const nb = this._contentObjs[this._contentObjs.length - 1];
+      nb.on('pointerdown', () => {
+        window.GameState.playerMoney -= notchCost;
+        window.GameState.relicNotches = (window.GameState.relicNotches || 4) + 1;
+        window.saveGame();
+        this.refreshGold();
+        this.clearContent(); this.buildShop();
+      });
+    }
   }
 
   buyRelic(relic) {
@@ -675,16 +705,9 @@ class MenuScene extends Phaser.Scene {
     if (!window.GameState.relics) window.GameState.relics = [];
     window.GameState.relics.push(relic.id);
 
-    // Instant effects applied on purchase
-    if (relic.effect.maxHeart) {
-      window.GameState.maxHearts  = (window.GameState.maxHearts  || 3) + relic.effect.maxHeart;
-      window.GameState.hearts     = Math.min(window.GameState.hearts + relic.effect.maxHeart, window.GameState.maxHearts);
-    }
-
     window.saveGame();
     this.refreshGold();
     this.scene.get('HUDScene')?.updateHUD();
-    // Rebuild shop to reflect new owned state
     this.clearContent();
     this.buildShop();
   }
@@ -1083,6 +1106,162 @@ class MenuScene extends Phaser.Scene {
   }
 
   // ════════════════════════════════════════════════════════════════════
+  // RELICS TAB — equip / unequip charms (Hollow Knight notch system)
+  // ════════════════════════════════════════════════════════════════════
+
+  buildRelicsTab() {
+    const gs = window.GameState;
+    const owned    = gs.relics           || [];
+    const equipped = gs.equippedRelics   || [];
+    const maxNotches = gs.relicNotches   ?? 4;
+    const usedNotches = window.relicNotchesUsed ? window.relicNotchesUsed() : 0;
+    const add = o => { this._contentObjs.push(o); return o; };
+
+    // ── Header ─────────────────────────────────────────────────────────
+    add(this.add.text(480, 110, 'CHARMS', {
+      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#cc88ff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5, 0));
+
+    add(this.add.text(480, 140, '"Equip charms before battle — each costs notch slots."', {
+      fontSize: '11px', fontFamily: 'monospace', fontStyle: 'italic', color: '#6655aa'
+    }).setOrigin(0.5, 0));
+
+    // ── Notch display ──────────────────────────────────────────────────
+    const notchY = 162;
+    add(this.add.text(80, notchY, 'NOTCH SLOTS:', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#888899'
+    }));
+    for (let n = 0; n < maxNotches; n++) {
+      const filled = n < usedNotches;
+      const ng = add(this.add.graphics());
+      ng.fillStyle(filled ? 0x8844cc : 0x222233);
+      ng.lineStyle(1, filled ? 0xaa66ff : 0x444455);
+      ng.fillRoundedRect(220 + n * 28, notchY, 22, 22, 4);
+      ng.strokeRoundedRect(220 + n * 28, notchY, 22, 22, 4);
+    }
+    add(this.add.text(220 + maxNotches * 28 + 8, notchY + 4, usedNotches + '/' + maxNotches, {
+      fontSize: '13px', fontFamily: 'monospace', color: usedNotches > maxNotches ? '#ff4444' : '#888888'
+    }));
+    add(this.add.text(880, notchY + 4, 'Buy more notches in SHOP (200G)', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#554466'
+    }).setOrigin(1, 0));
+
+    const divG = add(this.add.graphics());
+    divG.lineStyle(1, 0x332244);
+    divG.lineBetween(40, 195, 920, 195);
+
+    if (owned.length === 0) {
+      add(this.add.text(480, 340, 'No charms in your bag.\nBuy charms from the SHOP.', {
+        fontSize: '15px', fontFamily: 'monospace', color: '#443344', align: 'center'
+      }).setOrigin(0.5, 0));
+      return;
+    }
+
+    // ── Charm grid ─────────────────────────────────────────────────────
+    const CW = 410, CH = 88, COLS = 2, CGAP = 12;
+    const startX = 480 - (COLS * CW + (COLS - 1) * CGAP) / 2;
+    let startY = 202;
+
+    owned.forEach((relicId, i) => {
+      const relic = window.RELIC_MAP?.[relicId];
+      if (!relic) return;
+
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const rx = startX + col * (CW + CGAP);
+      const ry = startY + row * (CH + 8);
+
+      const isEquipped = equipped.includes(relicId);
+      const notchColor = relic.notches === 1 ? 0x44cc44 : relic.notches === 2 ? 0x4488ff : 0xff4444;
+
+      const bg = add(this.add.graphics());
+      bg.fillStyle(isEquipped ? 0x1a0a2e : 0x0c0c18);
+      bg.fillRoundedRect(rx, ry, CW, CH, 6);
+      bg.lineStyle(2, isEquipped ? notchColor : 0x222233);
+      bg.strokeRoundedRect(rx, ry, CW, CH, 6);
+
+      // Notch cost dots
+      for (let n = 0; n < relic.notches; n++) {
+        const ng = add(this.add.graphics());
+        ng.fillStyle(isEquipped ? notchColor : 0x333344);
+        ng.fillRect(rx + 8 + n * 12, ry + 6, 9, 9);
+      }
+
+      add(this.add.text(rx + 8 + relic.notches * 12 + 4, ry + 4, relic.name, {
+        fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: isEquipped ? '#cc88ff' : '#8888aa'
+      }));
+
+      add(this.add.text(rx + 8, ry + 24, relic.desc, {
+        fontSize: '9px', fontFamily: 'monospace', color: '#777788',
+        wordWrap: { width: CW - 120 }
+      }));
+
+      add(this.add.text(rx + 8, ry + CH - 16, relic.notches + ' notch' + (relic.notches > 1 ? 'es' : ''), {
+        fontSize: '9px', fontFamily: 'monospace', color: '#' + notchColor.toString(16).padStart(6, '0')
+      }));
+
+      // Equip / Unequip button
+      if (isEquipped) {
+        const btn = add(this.add.text(rx + CW - 10, ry + CH/2, '[UNEQUIP]', {
+          fontSize: '11px', fontFamily: 'monospace', color: '#aa6666',
+          backgroundColor: '#220000', padding: { x: 6, y: 4 }
+        }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+        btn.on('pointerdown', () => this.toggleRelic(relicId, false));
+        btn.on('pointerover', () => btn.setStyle({ color: '#ff8888' }));
+        btn.on('pointerout',  () => btn.setStyle({ color: '#aa6666' }));
+      } else {
+        const wouldOverflow = usedNotches + relic.notches > maxNotches;
+        const btnColor = wouldOverflow ? '#554444' : '#44aa44';
+        const btnLabel = wouldOverflow ? '[NO SPACE]' : '[EQUIP]';
+        const btn = add(this.add.text(rx + CW - 10, ry + CH/2, btnLabel, {
+          fontSize: '11px', fontFamily: 'monospace', color: btnColor,
+          backgroundColor: wouldOverflow ? '#111111' : '#001100', padding: { x: 6, y: 4 }
+        }).setOrigin(1, 0.5));
+        if (!wouldOverflow) {
+          btn.setInteractive({ useHandCursor: true });
+          btn.on('pointerdown', () => this.toggleRelic(relicId, true));
+          btn.on('pointerover', () => btn.setStyle({ color: '#88ff88' }));
+          btn.on('pointerout',  () => btn.setStyle({ color: '#44aa44' }));
+        }
+      }
+    });
+  }
+
+  toggleRelic(relicId, equip) {
+    const relic = window.RELIC_MAP?.[relicId];
+    if (!relic) return;
+    if (!window.GameState.equippedRelics) window.GameState.equippedRelics = [];
+
+    if (equip) {
+      const used = window.relicNotchesUsed ? window.relicNotchesUsed() : 0;
+      const max  = window.relicNotchSlots  ? window.relicNotchSlots()  : 4;
+      if (used + relic.notches > max) return;
+      if (!window.GameState.equippedRelics.includes(relicId)) {
+        window.GameState.equippedRelics.push(relicId);
+        // Permanent effects on equip (Iron Heart)
+        if (relic.effect.maxHeart && relic.permanent) {
+          window.GameState.maxHearts = (window.GameState.maxHearts || 3) + relic.effect.maxHeart;
+          window.GameState.hearts    = Math.min(window.GameState.hearts + relic.effect.maxHeart, window.GameState.maxHearts);
+          this.scene.get('HUDScene')?.updateHUD();
+        }
+      }
+    } else {
+      window.GameState.equippedRelics = window.GameState.equippedRelics.filter(id => id !== relicId);
+      // Reverse permanent effects on unequip
+      if (relic.effect.maxHeart && relic.permanent) {
+        window.GameState.maxHearts = Math.max(1, (window.GameState.maxHearts || 3) - relic.effect.maxHeart);
+        window.GameState.hearts    = Math.min(window.GameState.hearts, window.GameState.maxHearts);
+        this.scene.get('HUDScene')?.updateHUD();
+      }
+    }
+
+    window.saveGame();
+    this.clearContent();
+    this.buildRelicsTab();
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   // STATS TAB
   // ════════════════════════════════════════════════════════════════════
 
@@ -1113,7 +1292,7 @@ class MenuScene extends Phaser.Scene {
       ['Islands Visited',      (gs.visitedIslands || [0]).map(i => ISLAND_NAMES[i]).join(', '),'#aaffaa'],
       ['Collection Size',      gs.playerCollection.length + ' cards',                          '#cc88ff'],
       ['Deck Size',            gs.playerDeck.length + ' / 30 cards',                           '#aaddff'],
-      ['Relics Owned',         (gs.relics || []).length + ' relics',                           '#cc88ff'],
+      ['Charms',               (gs.equippedRelics || []).length + ' equipped / ' + (gs.relics || []).length + ' owned  (notches: ' + (gs.relicNotches ?? 4) + ')', '#cc88ff'],
       ['Card Upgrades',        Object.keys(gs.upgradedCards || {}).length + ' cards forged',   '#ff8822'],
       ['Quests Complete',      (window.QUESTS?.filter(q => gs.questProgress?.[q.id]?.status === 'claimed').length || 0) +
                                ' / ' + (window.QUESTS?.length || 0),                           '#44cc88'],
@@ -1136,18 +1315,18 @@ class MenuScene extends Phaser.Scene {
       ry += rowH;
     });
 
-    // Relic list (if any)
-    const ownedRelics = gs.relics || [];
-    if (ownedRelics.length > 0 && window.RELIC_MAP) {
+    // Equipped charm list (if any)
+    const equippedRelics = gs.equippedRelics || [];
+    if (equippedRelics.length > 0 && window.RELIC_MAP) {
       ry += 8;
-      add(this.add.text(left, ry, 'ACTIVE RELICS:', {
+      add(this.add.text(left, ry, 'EQUIPPED CHARMS:', {
         fontSize: '13px', fontFamily: 'monospace', color: '#8844cc', fontStyle: 'bold'
       }));
       ry += 20;
-      ownedRelics.forEach(rid => {
+      equippedRelics.forEach(rid => {
         const relic = window.RELIC_MAP[rid];
         if (!relic) return;
-        add(this.add.text(left + 10, ry, relic.name + '  —  ' + relic.desc, {
+        add(this.add.text(left + 10, ry, relic.name + ' (' + relic.notches + ' notch' + (relic.notches > 1 ? 'es' : '') + ')  —  ' + relic.desc, {
           fontSize: '11px', fontFamily: 'monospace', color: '#aa66dd'
         }));
         ry += 18;
