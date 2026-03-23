@@ -36,6 +36,8 @@ window.resetGameState = function() {
     // Player level
     playerXP:         0,
     playerLevel:      1,
+    // Card upgrades (id -> count)
+    upgradedCards:    {},
   };
 };
 
@@ -62,8 +64,9 @@ window.saveGame = function() {
       currentIsland:  gs.currentIsland || 0,
       visitedIslands: gs.visitedIslands || [0],
       relics:         gs.relics || [],
-      playerXP:       gs.playerXP    || 0,
-      playerLevel:    gs.playerLevel || 1,
+      playerXP:       gs.playerXP       || 0,
+      playerLevel:    gs.playerLevel    || 1,
+      upgradedCards:  gs.upgradedCards  || {},
       savedAt:        Date.now(),
     };
     localStorage.setItem('blooddungeon_save', JSON.stringify(data));
@@ -111,6 +114,16 @@ window.loadGame = function() {
     gs.relics           = data.relics          ?? [];
     gs.playerXP         = data.playerXP        ?? 0;
     gs.playerLevel      = data.playerLevel      ?? 1;
+    gs.upgradedCards    = data.upgradedCards    ?? {};
+    // Re-apply card upgrades to CARD_MAP on load
+    if (window.CARD_MAP) {
+      Object.entries(gs.upgradedCards).forEach(([id, count]) => {
+        const card = window.CARD_MAP[id];
+        if (!card || count <= 0) return;
+        if (card.type === 'demon') card.atk += count;
+        else if (card.value !== undefined) card.value += count;
+      });
+    }
     return true;
   } catch(e) {
     console.warn('Load failed:', e);

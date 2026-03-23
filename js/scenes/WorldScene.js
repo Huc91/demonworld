@@ -62,6 +62,7 @@ class WorldScene extends Phaser.Scene {
     this.buildPoneglyphs();
     this.buildBoat();
     this.buildAnimals();
+    this.buildBlacksmith();
 
     // ── Boss proximity warning (shown once per boss per session) ──────────
     this._bossWarned = new Set();
@@ -1525,6 +1526,139 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
+  // ─────────────────── BLACKSMITH ─────────────────────────────────────────
+
+  buildBlacksmith() {
+    // Only on home island
+    if ((window.GameState.currentIsland || 0) !== 0) return;
+
+    const bx = 124 * TILE + TILE/2;
+    const by = 107 * TILE + TILE/2;
+
+    const sprite = this.add.sprite(bx, by, 'npc').setDepth(10).setScale(1.1).setTint(0xff8822);
+    this.tweens.add({ targets: sprite, y: by - 4, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    this.add.text(bx, by - 26, 'Blacksmith', {
+      fontSize: '9px', fontFamily: 'monospace',
+      color: '#ff8822', stroke: '#000', strokeThickness: 2,
+      backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+    }).setDepth(11).setOrigin(0.5);
+
+    this.add.text(bx, by - 38, '[F]', {
+      fontSize: '8px', fontFamily: 'monospace',
+      color: '#888888', stroke: '#000', strokeThickness: 2,
+    }).setDepth(11).setOrigin(0.5);
+
+    this.blacksmithPos = { x: bx, y: by };
+  }
+
+  _showBlacksmithUI() {
+    if (this._dialogueActive) return;
+    this._dialogueActive = true;
+
+    const cx = this.cameras.main.scrollX + 480;
+    const cy = this.cameras.main.scrollY + 320;
+    const W = 820, H = 420;
+    const objs = [];
+    const add = o => { objs.push(o); return o; };
+
+    add(this.add.graphics().setDepth(290))
+      .fillStyle(0x0d0810, 0.97).fillRoundedRect(cx - W/2, cy - H/2, W, H, 10)
+      .lineStyle(2, 0xff6600).strokeRoundedRect(cx - W/2, cy - H/2, W, H, 10);
+
+    add(this.add.text(cx, cy - H/2 + 16, 'BLACKSMITH — CARD FORGE', {
+      fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#ff8822', stroke: '#000', strokeThickness: 4
+    }).setDepth(291).setOrigin(0.5, 0));
+
+    add(this.add.text(cx, cy - H/2 + 42, '"I can upgrade any card in your deck. 60G per forge."', {
+      fontSize: '11px', fontFamily: 'monospace', fontStyle: 'italic', color: '#aa6633'
+    }).setDepth(291).setOrigin(0.5, 0));
+
+    // Show deck cards (upgradeable)
+    const deckCards = window.GameState.playerDeck || [];
+    const unique = [...new Set(deckCards)].map(id => window.CARD_MAP[id]).filter(Boolean);
+    unique.sort((a, b) => a.cost - b.cost);
+
+    const COLS = 5, CW = 140, CH = 50, GAP = 8;
+    const gridStartX = cx - W/2 + 20;
+    const gridStartY = cy - H/2 + 70;
+    const UPGRADE_COST = 60;
+
+    const canAfford = window.GameState.playerMoney >= UPGRADE_COST;
+
+    unique.slice(0, 15).forEach((card, i) => {
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const rx = gridStartX + col * (CW + GAP);
+      const ry = gridStartY + row * (CH + GAP);
+
+      // Check if already upgraded (track in GameState.upgradedCards)
+      const upgCount = (window.GameState.upgradedCards || {})[card.id] || 0;
+      const maxUpgrades = 3;
+      const canUpgrade = canAfford && upgCount < maxUpgrades;
+
+      const bg = add(this.add.graphics().setDepth(292));
+      bg.fillStyle(canUpgrade ? 0x221100 : 0x111111);
+      bg.fillRoundedRect(rx, ry, CW, CH, 4);
+      bg.lineStyle(1, canUpgrade ? 0xff6600 : 0x333333);
+      bg.strokeRoundedRect(rx, ry, CW, CH, 4);
+
+      const statStr = card.type === 'demon'
+        ? ('Atk:' + (card.atk + upgCount) + ' Hp:' + card.hp)
+        : ('Val:+' + (upgCount > 0 ? upgCount : '0') + ' bonus');
+      add(this.add.text(rx + 6, ry + 6, card.name, {
+        fontSize: '9px', fontFamily: 'monospace', color: canUpgrade ? '#ffcc88' : '#666666',
+        wordWrap: { width: CW - 12 }
+      }).setDepth(292));
+      add(this.add.text(rx + 6, ry + 26, statStr + (upgCount > 0 ? ' (+' + upgCount + ')' : ''), {
+        fontSize: '8px', fontFamily: 'monospace', color: '#886644'
+      }).setDepth(292));
+
+      if (canUpgrade) {
+        const btn = add(this.add.text(rx + CW - 6, ry + CH/2, '[+60G]', {
+          fontSize: '9px', fontFamily: 'monospace', color: '#ff8822',
+          backgroundColor: '#331100', padding: { x: 3, y: 2 }
+        }).setOrigin(1, 0.5).setDepth(292).setInteractive({ useHandCursor: true }));
+        btn.on('pointerdown', () => {
+          if (window.GameState.playerMoney < UPGRADE_COST) return;
+          window.GameState.playerMoney -= UPGRADE_COST;
+          if (!window.GameState.upgradedCards) window.GameState.upgradedCards = {};
+          window.GameState.upgradedCards[card.id] = (window.GameState.upgradedCards[card.id] || 0) + 1;
+          // Apply upgrade to CARD_MAP (permanent in session)
+          if (card.type === 'demon') { card.atk++; card.currentAtk = card.atk; }
+          else if (card.value !== undefined) { card.value++; }
+          window.saveGame();
+          objs.forEach(o => { try { o.destroy(); } catch(e){} });
+          this._dialogueActive = false;
+          this._showBlacksmithUI();
+        });
+        btn.on('pointerover', () => btn.setStyle({ color: '#ffcc44' }));
+        btn.on('pointerout',  () => btn.setStyle({ color: '#ff8822' }));
+      } else if (upgCount >= maxUpgrades) {
+        add(this.add.text(rx + CW - 6, ry + CH/2, 'MAX', {
+          fontSize: '8px', fontFamily: 'monospace', color: '#886600'
+        }).setOrigin(1, 0.5).setDepth(292));
+      }
+    });
+
+    if (!canAfford) {
+      add(this.add.text(cx, cy + H/2 - 30, 'Need 60G to forge. Come back with more gold!', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#884422', fontStyle: 'italic'
+      }).setDepth(292).setOrigin(0.5, 1));
+    }
+
+    const close = () => {
+      objs.forEach(o => { try { o.destroy(); } catch(e){} });
+      this._dialogueActive = false;
+    };
+    const closeBtn = add(this.add.text(cx + W/2 - 12, cy - H/2 + 12, '[F] Close', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#666666'
+    }).setDepth(292).setOrigin(1, 0).setInteractive({ useHandCursor: true }));
+    closeBtn.on('pointerdown', close);
+    this.input.keyboard.once('keydown-F', close);
+    this.time.delayedCall(30000, () => { if (this._dialogueActive) close(); });
+  }
+
   // ─────────────────── PONEGLYPHS ─────────────────────────────────────────
 
   buildPoneglyphs() {
@@ -2020,6 +2154,14 @@ class WorldScene extends Phaser.Scene {
       const hm = this.harborMasterPos;
       if (Math.sqrt((hm.x - px)**2 + (hm.y - py)**2) < 50) {
         this._showHarborDialogue(); return;
+      }
+    }
+
+    // Priority 0b2: Blacksmith
+    if (this.blacksmithPos) {
+      const bs = this.blacksmithPos;
+      if (Math.sqrt((bs.x - px)**2 + (bs.y - py)**2) < 50) {
+        this._showBlacksmithUI(); return;
       }
     }
 
