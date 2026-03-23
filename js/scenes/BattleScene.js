@@ -446,11 +446,42 @@ class BattleScene extends Phaser.Scene {
     [...this.playerFront, ...this.playerRear].forEach(d => {
       if (d.ability === 'taunt_regen') { d.currentHp = Math.min(d.hp, d.currentHp + 1); }
     });
+    // Poison tick — demons
+    this._tickPoison(this.enemyFront, false);
+    this._tickPoison(this.enemyRear, false);
+    this._tickPoison(this.playerFront, true);
+    this._tickPoison(this.playerRear, true);
+    // Face poison (Plague Surge)
+    if (this._enemyFacePoison > 0) {
+      this.enemyLife -= this._enemyFacePoison;
+      this.showFloat(700, 80, 'Plague! -' + this._enemyFacePoison, '#44ff44');
+      this._enemyFacePoison = Math.max(0, this._enemyFacePoison - 1);
+    }
+    if (this._playerFacePoison > 0) {
+      this.playerLife -= this._playerFacePoison;
+      this._playerFacePoison = Math.max(0, this._playerFacePoison - 1);
+    }
+    this.checkWin();
+
     this.updateUI();
     this.renderAll();
     this.txtTurn.setText('YOUR TURN  (turn ' + this.turnNumber + ')');
     this.btnEndTurn.setAlpha(1);
     this.btnCancel.setVisible(false);
+  }
+
+  _tickPoison(row, isPlayer) {
+    const gy = isPlayer ? this.playerGraveyard : this.enemyGraveyard;
+    [...row].forEach(demon => {
+      if (!demon.poisoned || demon.poisoned <= 0) return;
+      demon.poisoned--;
+      demon.currentHp--;
+      this.addLog(demon.name + ' takes 1 poison damage', '#44ff44');
+      if (demon.currentHp <= 0) {
+        this.addLog(demon.name + ' dies from poison!', '#44ff44');
+        this.killFrom(row, gy, demon);
+      }
+    });
   }
 
   endPlayerTurn() {
@@ -1460,6 +1491,31 @@ class BattleScene extends Phaser.Scene {
         }
         break;
       }
+      case 'poison_all_enemy':
+        foeBoard.forEach(d => { d.poisoned = (d.poisoned || 0) + card.value; });
+        fx(700, 150, 'Toxic Cloud! All poisoned ' + card.value + ' turns!', '#44ff44');
+        break;
+      case 'poison_one_enemy':
+        if (foeBoard.length) {
+          const t = foeBoard[0];
+          t.poisoned = (t.poisoned || 0) + card.value;
+          fx(700, 150, 'Venom Strike! ' + t.name + ' poisoned!', '#44ff44');
+        }
+        break;
+      case 'cure_all_friendly':
+        myBoard.forEach(d => { d.poisoned = 0; });
+        fx(340, 285, 'Cure! All poison removed!', '#44ff88');
+        break;
+      case 'poison_face':
+        if (me) {
+          this.enemyLife -= card.value;
+          this._enemyFacePoison = (this._enemyFacePoison || 0) + card.value;
+          fx(700, 80, 'Plague Surge! -' + card.value + ' now + more!', '#44ff44');
+        } else {
+          this.playerLife -= card.value;
+          this._playerFacePoison = (this._playerFacePoison || 0) + card.value;
+        }
+        break;
     }
   }
 
@@ -2460,6 +2516,17 @@ class BattleScene extends Phaser.Scene {
 
     if (demon.exhausted) {
       arr.push(this.add.text(cx, cy, 'ZZZ', { fontSize:'12px', fontFamily:'monospace', color:'#666688' }).setOrigin(0.5).setDepth(DEPTH+.3));
+    }
+
+    // Poison badge (green PSN x turns)
+    if (demon.poisoned > 0) {
+      const pbg = this.add.graphics().setDepth(DEPTH+.3);
+      pbg.fillStyle(0x006600); pbg.fillRect(cx-W/2, cy-H/2, 26, 12);
+      arr.push(pbg,
+        this.add.text(cx-W/2+13, cy-H/2+6, 'PSN' + demon.poisoned, {
+          fontSize:'7px', fontFamily:'monospace', fontStyle:'bold', color:'#88ff44'
+        }).setOrigin(0.5).setDepth(DEPTH+.4)
+      );
     }
 
     // Forge badge on player demons

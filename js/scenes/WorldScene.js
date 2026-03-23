@@ -1581,7 +1581,7 @@ class WorldScene extends Phaser.Scene {
 
     const cx = this.cameras.main.scrollX + 480;
     const cy = this.cameras.main.scrollY + 320;
-    const W = 820, H = 420;
+    const W = 820, H = 480;
     const objs = [];
     const add = o => { objs.push(o); return o; };
 
@@ -1609,8 +1609,14 @@ class WorldScene extends Phaser.Scene {
     const UPGRADE_COST = 60;
 
     const canAfford = window.GameState.playerMoney >= UPGRADE_COST;
+    const maxShow = 20; // show up to 20 unique cards (4 rows of 5)
+    if (unique.length > maxShow) {
+      add(this.add.text(cx, cy - H/2 + 56, '(Showing ' + maxShow + ' of ' + unique.length + ' unique cards — sort by cost)', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#555544', fontStyle: 'italic'
+      }).setDepth(291).setOrigin(0.5, 0));
+    }
 
-    unique.slice(0, 15).forEach((card, i) => {
+    unique.slice(0, maxShow).forEach((card, i) => {
       const col = i % COLS, row = Math.floor(i / COLS);
       const rx = gridStartX + col * (CW + GAP);
       const ry = gridStartY + row * (CH + GAP);

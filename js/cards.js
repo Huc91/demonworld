@@ -743,6 +743,14 @@ window.CARDS = [
   { id: 'spell_059', name: 'Magma Burst',  type: 'spell', cost: 2, manaValue: 1, rarity: 'rare',      effect: 'damage',    value: 5, desc: 'Deal 5 damage. The volcano does not miss.' },
   { id: 'spell_060', name: 'Blizzard',     type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',      effect: 'aoe_enemy', value: 3, desc: 'Deal 3 damage to all enemy demons. Even the undead feel cold.' },
   { id: 'spell_061', name: 'Lava Shield',  type: 'spell', cost: 1, manaValue: 1, rarity: 'uncommon',  effect: 'buff_hp',   value: 4, desc: 'Give a friendly demon +4 HP. Hardened from within.' },
+
+  // ══════════════════════════════════════════════════════
+  //  POISON / STATUS — new mechanic
+  // ══════════════════════════════════════════════════════
+  { id: 'spell_062', name: 'Toxic Cloud',   type: 'spell', cost: 2, manaValue: 1, rarity: 'uncommon', effect: 'poison_all_enemy', value: 3, desc: 'Poison all enemy demons for 3 turns (1 dmg/turn).' },
+  { id: 'spell_063', name: 'Venom Strike',  type: 'spell', cost: 1, manaValue: 1, rarity: 'common',   effect: 'poison_one_enemy', value: 4, desc: 'Poison one enemy demon for 4 turns (1 dmg/turn).' },
+  { id: 'spell_064', name: 'Cure',          type: 'spell', cost: 1, manaValue: 1, rarity: 'uncommon', effect: 'cure_all_friendly',value: 0, desc: 'Remove all poison from your demons.' },
+  { id: 'spell_065', name: 'Plague Surge',  type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',     effect: 'poison_face',      value: 2, desc: 'Deal 2 damage now, then 2 more each turn for 2 turns.' },
 ];
 
 window.CARD_MAP = {};
