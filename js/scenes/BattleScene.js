@@ -383,9 +383,16 @@ class BattleScene extends Phaser.Scene {
     this.playerMana = 0;
     this.rowMoveDone = false;
     this.arsenalUsedThisTurn = false;
-    if (isFirst && !this.playerGoesFirst) {
-      this.playerMana = 1;
-      this.showFloat(480, 460, '+1 MANA (going second bonus)', '#4499ff');
+    if (isFirst) {
+      // Apply relic starting mana on first turn (only once per battle)
+      this.playerMana += (this._relicStartMana || 0);
+      if (!this.playerGoesFirst) {
+        this.playerMana += 1; // +1 going-second bonus
+        this.showFloat(480, 460, '+1 MANA (going second bonus)', '#4499ff');
+      }
+      if (this._relicStartMana > 0) {
+        this.showFloat(480, 490, '+' + this._relicStartMana + ' MANA (charm bonus)', '#cc88ff');
+      }
     }
     this.playerFront.forEach(d => { d.exhausted = false; d.attacksThisTurn = 0; });
     this.playerRear.forEach(d => { d.exhausted = false; d.attacksThisTurn = 0; });
@@ -2478,7 +2485,21 @@ class BattleScene extends Phaser.Scene {
         stroke: '#000', strokeThickness: 4, align: 'center'
       }).setOrigin(0.5).setDepth(21);
 
-      const btn = this.add.text(480, 400, '[ CONTINUE ]', {
+      // Kill streak indicator (streak will be incremented on battleWon, so peek at current + 1)
+      const worldScene = this.scene.get('WorldScene');
+      const currentStreak = (worldScene?._killStreak || 0) + 1;
+      if (currentStreak >= 2) {
+        const streakColor = currentStreak >= 10 ? '#ff4400' : currentStreak >= 5 ? '#ff8800' : '#ffdd00';
+        const streakLabel = currentStreak >= 10 ? currentStreak + '-KILL STREAK  🔥🔥🔥'
+                          : currentStreak >= 5  ? currentStreak + '-KILL STREAK  🔥🔥'
+                          : currentStreak + '-KILL STREAK';
+        this.add.text(480, 360, streakLabel, {
+          fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold',
+          color: streakColor, stroke: '#000', strokeThickness: 3
+        }).setOrigin(0.5).setDepth(21);
+      }
+
+      const btn = this.add.text(480, currentStreak >= 2 ? 416 : 400, '[ CONTINUE ]', {
         fontSize: '28px', fontFamily: 'monospace', color: '#44ff44',
         stroke: '#000', strokeThickness: 4
       }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true });

@@ -160,6 +160,19 @@ class WorldScene extends Phaser.Scene {
         });
       }
 
+      // ── Kill streak ───────────────────────────────────────────────────
+      if (reward.enemyDef) {
+        this._killStreak = (this._killStreak || 0) + 1;
+        const streakBonuses = { 3: 10, 5: 25, 10: 50 };
+        const streakBonus = streakBonuses[this._killStreak];
+        if (streakBonus) {
+          window.GameState.playerMoney += streakBonus;
+          this.time.delayedCall(2200, () =>
+            this.showMessage(this._killStreak + '-KILL STREAK!  +' + streakBonus + 'G', '#ffdd00')
+          );
+        }
+      }
+
       this.battleCooldown = false;
       this.physics.resume();
       const hud = this.scene.get('HUDScene');
@@ -177,6 +190,7 @@ class WorldScene extends Phaser.Scene {
     });
 
     this.events.on('battleLost', () => {
+      this._killStreak = 0;
       window.GameState.hearts = Math.max(0, window.GameState.hearts - 1);
       this.battleCooldown = false;
       this.physics.resume();
