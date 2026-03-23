@@ -103,6 +103,29 @@ class WorldScene extends Phaser.Scene {
         window.GameState.defeatedEnemy = null;
       }
 
+      // ── XP and Level-up ──────────────────────────────────────────────
+      if (reward.enemyDef) {
+        const isBossXP = reward.enemyDef.isBoss || reward.enemyDef.difficulty === 'boss';
+        const xpGain = isBossXP ? 80 : (reward.enemyDef.difficulty === 'hard' ? 20 : 10);
+        window.GameState.playerXP    = (window.GameState.playerXP    || 0) + xpGain;
+        window.GameState.playerLevel = (window.GameState.playerLevel || 1);
+        const xpNeeded = window.GameState.playerLevel * 50;
+        if (window.GameState.playerXP >= xpNeeded) {
+          window.GameState.playerXP -= xpNeeded;
+          window.GameState.playerLevel++;
+          const lv = window.GameState.playerLevel;
+          // Every 5 levels: +1 max heart (cap 6)
+          if (lv % 5 === 0 && window.GameState.maxHearts < 6) {
+            window.GameState.maxHearts++;
+            window.GameState.hearts = Math.min(window.GameState.hearts + 1, window.GameState.maxHearts);
+            this.time.delayedCall(1200, () => this.showMessage('LEVEL ' + lv + '! +1 MAX HEART!', '#ff6699'));
+          } else {
+            this.time.delayedCall(1200, () => this.showMessage('LEVEL UP! Lv.' + lv + '  (+ battle HP)', '#ffd700'));
+          }
+          this.scene.get('HUDScene').updateHUD();
+        }
+      }
+
       // ── Quest progress tracking ───────────────────────────────────────
       if (reward.enemyDef) {
         const isBoss = reward.enemyDef.isBoss || reward.enemyDef.difficulty === 'boss';

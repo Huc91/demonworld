@@ -22,8 +22,14 @@ class HUDScene extends Phaser.Scene {
       color: '#cc88ff', stroke: '#000', strokeThickness: 3
     });
 
-    // Hearts container (right of collection text)
-    this.heartsContainer = this.add.container(580, 8);
+    // Level text (between collection and hearts)
+    this.levelText = this.add.text(545, 8, '', {
+      fontSize: '14px', fontFamily: 'monospace',
+      color: '#ffdd44', stroke: '#000', strokeThickness: 3
+    });
+
+    // Hearts container
+    this.heartsContainer = this.add.container(620, 8);
 
     const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes'];
     const islandName = ISLAND_NAMES[window.GameState?.currentIsland || 0] || 'Home Island';
@@ -75,7 +81,11 @@ class HUDScene extends Phaser.Scene {
   updateHUD() {
     this.moneyText.setText('G: ' + window.GameState.playerMoney);
     this.deckText.setText('Deck: ' + window.GameState.playerDeck.length + ' cards');
-    this.collectionText.setText('Collection: ' + window.GameState.playerCollection.length);
+    this.collectionText.setText('Coll: ' + window.GameState.playerCollection.length);
+    const lv  = window.GameState.playerLevel  || 1;
+    const xp  = window.GameState.playerXP     || 0;
+    const xpN = lv * 50;
+    this.levelText.setText('Lv.' + lv + ' [' + xp + '/' + xpN + ']');
     this._renderHearts();
     this._renderActiveQuest();
   }

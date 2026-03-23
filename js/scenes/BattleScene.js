@@ -16,7 +16,8 @@ class BattleScene extends Phaser.Scene {
     this._relicDemonAtkBonus = _relics.includes('relic_collar') ? 1 : 0;
     this._relicGoldBonus     = _relics.includes('relic_gold')   ? 1.30 : 1.0;
 
-    this.playerLife  = 20 + _relicBonusHp;
+    const _levelHpBonus = Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2);
+    this.playerLife  = 20 + _relicBonusHp + _levelHpBonus;
     this.enemyLife   = this.enemyDef.life || 10;
     this.playerMana  = _relicStartMana;
     this.turnNumber  = 1;
@@ -2524,7 +2525,9 @@ class BattleScene extends Phaser.Scene {
     this.txtEnemyDeck.setText('Deck: ' + this.enemyDeck.length);
     this.txtEnemyHand.setText('Hand: ' + this.enemyHand.length);
     this.txtEnemyGY.setText('⚰ GY: ' + this.enemyGraveyard.length);
-    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / 20');
+    const maxHp = 20 + Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2) +
+                  (window.GameState?.relics || []).reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.bonusHp || 0), 0);
+    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / ' + maxHp + '  Lv.' + (window.GameState?.playerLevel || 1));
     this.txtPlayerMana.setText('◆ Mana: ' + this.playerMana);
     this.txtDeckInfo.setText('Deck ' + this.playerDeck.length + '  Hand ' + this.playerHand.length);
     this.txtPlayerGY.setText('⚰ GY: ' + this.playerGraveyard.length);
