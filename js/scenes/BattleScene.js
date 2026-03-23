@@ -17,7 +17,8 @@ class BattleScene extends Phaser.Scene {
     this._relicGoldBonus     = _relics.includes('relic_gold')   ? 1.30 : 1.0;
 
     const _levelHpBonus = Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2);
-    this.playerLife  = 20 + _relicBonusHp + _levelHpBonus;
+    this.playerMaxLife = 20 + _relicBonusHp + _levelHpBonus;
+    this.playerLife    = this.playerMaxLife;
     this.enemyLife   = this.enemyDef.life || 10;
     this.playerMana  = _relicStartMana;
     this.turnNumber  = 1;
@@ -802,7 +803,7 @@ class BattleScene extends Phaser.Scene {
         break;
       }
       case 'battlecry_heal_3':
-        if (me) { this.playerLife = Math.min(20, this.playerLife + 3); this.showFloat(340, 460, 'Heal +3!', '#44ff44'); }
+        if (me) { this.playerLife = Math.min(this.playerMaxLife, this.playerLife + 3); this.showFloat(340, 460, 'Heal +3!', '#44ff44'); }
         else    { this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + 3); }
         break;
       case 'battlecry_damage_player_1':
@@ -1121,7 +1122,7 @@ class BattleScene extends Phaser.Scene {
         else    { this.playerLife -= card.value; }
         break;
       case 'heal':
-        if (me) { this.playerLife = Math.min(20, this.playerLife + card.value); fx(340, 460, '+' + card.value + ' life', '#44ff44'); }
+        if (me) { this.playerLife = Math.min(this.playerMaxLife, this.playerLife + card.value); fx(340, 460, '+' + card.value + ' life', '#44ff44'); }
         else    { this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + card.value); }
         break;
       case 'draw':
@@ -1167,7 +1168,7 @@ class BattleScene extends Phaser.Scene {
       case 'life_per_demon':
         if (me) {
           const g = myBoard.length * card.value;
-          this.playerLife = Math.min(20, this.playerLife + g);
+          this.playerLife = Math.min(this.playerMaxLife, this.playerLife + g);
           fx(340, 460, '+' + g + ' life', '#44ff44');
         }
         break;
@@ -1284,7 +1285,7 @@ class BattleScene extends Phaser.Scene {
         break;
       }
       case 'deal_face_drain':
-        if (me) { this.enemyLife -= card.value; this.playerLife = Math.min(20, this.playerLife + card.value); fx(700, 80, 'Drain! -' + card.value + '/+' + card.value, '#44ff88'); }
+        if (me) { this.enemyLife -= card.value; this.playerLife = Math.min(this.playerMaxLife, this.playerLife + card.value); fx(700, 80, 'Drain! -' + card.value + '/+' + card.value, '#44ff88'); }
         else    { this.playerLife -= card.value; this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + card.value); }
         break;
       case 'destroy_all_both': {
@@ -1537,7 +1538,7 @@ class BattleScene extends Phaser.Scene {
     // ally_death_mana / ally_death_lifegain: only fires when a FRIENDLY demon dies
     if (deadOwner === 'player') {
       playerBoard.filter(d => d.ability === 'ally_death_mana').forEach(() => { this.playerMana += 1; });
-      playerBoard.filter(d => d.ability === 'ally_death_lifegain').forEach(() => { this.playerLife = Math.min(20, this.playerLife + 1); });
+      playerBoard.filter(d => d.ability === 'ally_death_lifegain').forEach(() => { this.playerLife = Math.min(this.playerMaxLife, this.playerLife + 1); });
     }
   }
 
@@ -1602,7 +1603,7 @@ class BattleScene extends Phaser.Scene {
       this.playerMana += 1; this.showFloat(340, 460, '+1 mana!', '#4499ff');
     }
     if (demon.ability && demon.ability.includes('lifesteal')) {
-      this.playerLife = Math.min(20, this.playerLife + demon.currentAtk);
+      this.playerLife = Math.min(this.playerMaxLife, this.playerLife + demon.currentAtk);
       this.showFloat(340, 460, '+' + demon.currentAtk + ' (Lifesteal)', '#44ff88');
     }
     this.showFloat(760, 80, '⚔ -' + demon.currentAtk, '#ff2222');
@@ -1645,7 +1646,7 @@ class BattleScene extends Phaser.Scene {
     if (target.ability && target.ability.includes('rage') && dmgToTarget > 0) target.currentAtk++;
 
     if (demon.ability && demon.ability.includes('lifesteal')) {
-      this.playerLife = Math.min(20, this.playerLife + dmgToTarget);
+      this.playerLife = Math.min(this.playerMaxLife, this.playerLife + dmgToTarget);
       this.showFloat(340, 460, '+' + dmgToTarget + ' (Lifesteal)', '#44ff88');
     }
 
@@ -2525,9 +2526,7 @@ class BattleScene extends Phaser.Scene {
     this.txtEnemyDeck.setText('Deck: ' + this.enemyDeck.length);
     this.txtEnemyHand.setText('Hand: ' + this.enemyHand.length);
     this.txtEnemyGY.setText('⚰ GY: ' + this.enemyGraveyard.length);
-    const maxHp = 20 + Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2) +
-                  (window.GameState?.relics || []).reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.bonusHp || 0), 0);
-    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / ' + maxHp + '  Lv.' + (window.GameState?.playerLevel || 1));
+    this.txtPlayerLife.setText('❤ ' + Math.max(0, this.playerLife) + ' / ' + this.playerMaxLife + '  Lv.' + (window.GameState?.playerLevel || 1));
     this.txtPlayerMana.setText('◆ Mana: ' + this.playerMana);
     this.txtDeckInfo.setText('Deck ' + this.playerDeck.length + '  Hand ' + this.playerHand.length);
     this.txtPlayerGY.setText('⚰ GY: ' + this.playerGraveyard.length);
