@@ -1132,10 +1132,19 @@ class WorldScene extends Phaser.Scene {
       this.cameras.main.flash(250, 200, 0, 0);
       this.cameras.main.shake(300, 0.008);
       this.time.delayedCall(300, () => {
-        this.scene.launch('BattleScene', { enemy: enemy.enemyData });
+        this.scene.launch('BattleScene', { enemy: this._scaleEnemy(enemy.enemyData) });
         this.scene.pause();
       });
     });
+  }
+
+  // Scale enemy HP based on player level (non-bosses only, slight increase)
+  _scaleEnemy(enemyDef) {
+    const lv = window.GameState?.playerLevel || 1;
+    if (lv <= 2 || enemyDef.isBoss) return enemyDef;
+    // +5% HP per level above 2, capped at +60% for lv 14+
+    const mult = Math.min(1 + (lv - 2) * 0.05, 1.60);
+    return { ...enemyDef, life: Math.round(enemyDef.life * mult) };
   }
 
   // ── INFERNO ISLAND ENEMIES ───────────────────────────────────────────────
@@ -1251,7 +1260,7 @@ class WorldScene extends Phaser.Scene {
       this.cameras.main.flash(250, 200, 0, 0);
       this.cameras.main.shake(300, 0.008);
       this.time.delayedCall(300, () => {
-        this.scene.launch('BattleScene', { enemy: enemy.enemyData });
+        this.scene.launch('BattleScene', { enemy: this._scaleEnemy(enemy.enemyData) });
         this.scene.pause();
       });
     });
