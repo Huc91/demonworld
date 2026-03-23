@@ -455,7 +455,7 @@ class BattleScene extends Phaser.Scene {
             if (demon.ability && demon.ability.includes('lifesteal')) {
               this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
             }
-            this._flashScreen(0xff0000, 0.22);
+            this._flashScreen(0xff0000);
             this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
             this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
           }
@@ -465,7 +465,7 @@ class BattleScene extends Phaser.Scene {
           if (demon.ability && demon.ability.includes('lifesteal')) {
             this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
           }
-          this._flashScreen(0xff0000, 0.22);
+          this._flashScreen(0xff0000);
           this.showFloat(340, 460, '⚔ -' + demon.currentAtk + '!', '#ff2222');
           this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
         }
@@ -1364,50 +1364,47 @@ class BattleScene extends Phaser.Scene {
     return sx + idx * (CW + GAP) + CW / 2;
   }
 
-  _flashScreen(color, alpha) {
-    const flash = this.add.rectangle(480, 320, 960, 640, color, alpha ?? 0.25).setDepth(97);
-    this.tweens.add({
-      targets: flash, alpha: 0,
-      duration: 280, ease: 'Power2',
-      onComplete: () => flash.destroy(),
-    });
+  _flashScreen(color) {
+    // GBA-style: single-frame white flash, snaps off
+    const flash = this.add.rectangle(480, 320, 960, 640, color, 1).setDepth(97);
+    this.time.delayedCall(50, () => flash.destroy());
   }
 
   _spawnDeathParticles(cx, cy, color) {
-    const COUNT = 14;
-    for (let k = 0; k < COUNT; k++) {
-      const angle  = (k / COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-      const speed  = 60 + Math.random() * 80;
-      const vx     = Math.cos(angle) * speed;
-      const vy     = Math.sin(angle) * speed;
-      const r      = 2 + Math.random() * 3;
+    // GBA-style: 8 pixel squares fly out in 8 directions, no alpha — they just move and disappear
+    const DIRS = [
+      [-1,-1],[ 0,-1],[ 1,-1],
+      [-1, 0],        [ 1, 0],
+      [-1, 1],[ 0, 1],[ 1, 1],
+    ];
+    DIRS.forEach(([dx, dy]) => {
+      const dist = 28 + Math.floor(Math.random() * 20);
+      const sz   = 2 + Math.floor(Math.random() * 3) * 2; // 2, 4, or 6px — always even for pixel-art
       const g = this.add.graphics().setDepth(99);
-      g.fillStyle(color, 0.9);
-      g.fillCircle(0, 0, r);
+      g.fillStyle(color, 1);
+      g.fillRect(-sz/2, -sz/2, sz, sz);
       g.x = cx; g.y = cy;
       this.tweens.add({
         targets: g,
-        x: cx + vx * 0.55,
-        y: cy + vy * 0.55,
-        alpha: 0,
-        scaleX: 0.2, scaleY: 0.2,
-        duration: 380 + Math.random() * 200,
-        ease: 'Power2',
-        onComplete: () => g.destroy(),
+        x: cx + dx * dist,
+        y: cy + dy * dist,
+        duration: 140,
+        ease: 'Linear',
+        onComplete: () => {
+          // Second phase: white replacement pixel, then gone
+          g.clear();
+          g.fillStyle(0xffffff, 1);
+          g.fillRect(-2, -2, 4, 4);
+          this.time.delayedCall(60, () => g.destroy());
+        },
       });
-    }
-    // Central flash
-    const flash = this.add.graphics().setDepth(98);
-    flash.fillStyle(0xffffff, 0.7);
-    flash.fillCircle(0, 0, 20);
-    flash.x = cx; flash.y = cy;
-    this.tweens.add({
-      targets: flash,
-      alpha: 0, scaleX: 3, scaleY: 3,
-      duration: 220,
-      ease: 'Power3',
-      onComplete: () => flash.destroy(),
     });
+    // White 4x4 flash at center — GBA hit spark
+    const spark = this.add.graphics().setDepth(99);
+    spark.fillStyle(0xffffff, 1);
+    spark.fillRect(-4, -4, 8, 8);
+    spark.x = cx; spark.y = cy;
+    this.time.delayedCall(80, () => spark.destroy());
   }
 
   cleanBoard(board, discard) {
@@ -1505,7 +1502,7 @@ class BattleScene extends Phaser.Scene {
     }
 
     this.enemyLife -= demon.currentAtk;
-    this._flashScreen(0xffaa00, 0.18);
+    this._flashScreen(0xffffff);
     demon.attacksThisTurn = (demon.attacksThisTurn || 0) + 1;
     demon.exhausted = !(demon.ability === 'double_attack' && demon.attacksThisTurn < 2);
     if (demon.ability === 'haste_face_draw' || demon.ability === 'face_damage_draw') {
@@ -2346,27 +2343,29 @@ class BattleScene extends Phaser.Scene {
       const cardDrop = Math.random() < 0.38 && this.enemyDef.rewardCard ? this.enemyDef.rewardCard : null;
       const isBoss = this.enemyDef.isBoss || this.enemyDef.difficulty === 'boss';
 
-      // Victory particle burst
+      // Victory pixel burst — GBA style (16 pixel squares fly to screen corners)
       const burstColors = isBoss
-        ? [0xffd700, 0xff4400, 0xffffff, 0xff8800]
-        : [0xffd700, 0xffffff, 0x44ff88];
-      for (let k = 0; k < (isBoss ? 40 : 20); k++) {
-        const angle = Math.random() * Math.PI * 2;
-        const spd   = 80 + Math.random() * 160;
-        const col   = burstColors[Math.floor(Math.random() * burstColors.length)];
-        const r     = 2 + Math.random() * 4;
+        ? [0xffd700, 0xff8800, 0xffffff, 0xff4400]
+        : [0xffd700, 0xffffff, 0x44ff88, 0xffd700];
+      for (let k = 0; k < 16; k++) {
+        const angle = (k / 16) * Math.PI * 2;
+        const dist  = 180 + (k % 3) * 60;
+        const col   = burstColors[k % burstColors.length];
+        const sz    = isBoss ? 6 : 4;
         const g = this.add.graphics().setDepth(22);
-        g.fillStyle(col, 0.9);
-        g.fillCircle(0, 0, r);
+        g.fillStyle(col, 1);
+        g.fillRect(-sz/2, -sz/2, sz, sz);
         g.x = 480; g.y = 320;
         this.tweens.add({
           targets: g,
-          x: 480 + Math.cos(angle) * spd,
-          y: 320 + Math.sin(angle) * spd,
-          alpha: 0, scaleX: 0.1, scaleY: 0.1,
-          duration: 500 + Math.random() * 400,
-          ease: 'Power2',
-          onComplete: () => g.destroy(),
+          x: 480 + Math.cos(angle) * dist,
+          y: 320 + Math.sin(angle) * dist,
+          duration: 180,
+          ease: 'Linear',
+          onComplete: () => {
+            g.clear(); g.fillStyle(0xffffff, 1); g.fillRect(-2,-2,4,4);
+            this.time.delayedCall(80, () => g.destroy());
+          },
         });
       }
 

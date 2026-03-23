@@ -38,6 +38,11 @@ class WorldScene extends Phaser.Scene {
     // ── Dialogue state ────────────────────────────────────────────────────
     this._dialogueActive = false;
 
+    // ── Weather ───────────────────────────────────────────────────────────
+    this._weatherParticles = [];
+    this._weatherTimer     = 0;
+    this._weatherGfx       = this.add.graphics().setDepth(19).setScrollFactor(0);
+
     // ── Build world ──────────────────────────────────────────────────────
     this.buildProceduralTextures();
     this.buildMap();
@@ -374,6 +379,13 @@ class WorldScene extends Phaser.Scene {
   // ─────────────────── MAP ────────────────────────────────────────────────
 
   buildMap() {
+    const island = window.GameState.currentIsland || 0;
+    if (island === 1) { this.buildMap_inferno(); return; }
+    if (island === 2) { this.buildMap_frost();   return; }
+    this.buildMap_home();
+  }
+
+  buildMap_home() {
     const W = 320, H = 200;
     this.mapWidth  = W;
     this.mapHeight = H;
@@ -714,11 +726,235 @@ class WorldScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, W * TILE, H * TILE);
   }
 
+  // ── INFERNO ISLAND MAP ────────────────────────────────────────────────────
+
+  buildMap_inferno() {
+    const W = 160, H = 120;
+    this.mapWidth  = W;
+    this.mapHeight = H;
+    this._islandSpawnTile = { x: 20, y: 60 };
+
+    // Tile constants — reuse existing palette + LAVA = SAND (7) tinted orange via overrides
+    const GRASS = 0, DIRT = 1, WATER = 2, WALL = 3, FLOOR = 4,
+          TREE = 5, MOUNTAIN = 6, SAND = 7, GRAVE_GRASS = 8;
+
+    const map = [];
+    for (let r = 0; r < H; r++) map[r] = new Array(W).fill(SAND);
+
+    const set = (r, c, t) => { if (r>=0&&r<H&&c>=0&&c<W) map[r][c]=t; };
+    const rect = (r0,c0,r1,c1,t) => { for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) set(r,c,t); };
+
+    // Volcanic mountain peaks — border
+    for (let r=0; r<H; r++)
+      for (let c=0; c<W; c++)
+        if (r<4||r>=H-4||c<4||c>=W-4) map[r][c]=MOUNTAIN;
+
+    // Central lava lake (WATER tile = lava in this context)
+    rect(45, 60, 75, 100, WATER);
+    rect(50, 68, 70,  92, DIRT);  // inner lava shore
+
+    // Volcano caldera — north-east
+    rect(10, 110, 35, 150, MOUNTAIN);
+    rect(14, 114, 30, 146, FLOOR);
+    for(let r=14;r<=30;r++){set(r,114,WALL);set(r,146,WALL);}
+    for(let c=114;c<=146;c++){set(14,c,WALL);set(30,c,WALL);}
+    set(30,128,FLOOR);set(30,129,FLOOR);
+    for(let r=31;r<38;r++){set(r,128,DIRT);set(r,129,DIRT);}
+
+    // Ruined fortress — west
+    rect(40, 10, 80, 50, FLOOR);
+    for(let r=40;r<=80;r++){set(r,10,WALL);set(r,50,WALL);}
+    for(let c=10;c<=50;c++){set(40,c,WALL);set(80,c,WALL);}
+    set(80,28,FLOOR);set(80,29,FLOOR);
+    // Fortress rooms
+    rect(44,14,58,30,WALL); set(58,22,FLOOR);
+    rect(44,34,58,48,WALL); set(58,41,FLOOR);
+    rect(64,14,78,48,WALL); set(64,31,FLOOR);
+
+    // Ash plains (GRAVE_GRASS used as ash ground)
+    for(let r=85;r<H-4;r++)
+      for(let c=4;c<W-4;c++)
+        if(Math.random()<0.6) map[r][c]=GRAVE_GRASS;
+
+    // Village of survivors — south-west
+    const VY1=88,VY2=110,VX1=10,VX2=45;
+    rect(VY1,VX1,VY2,VX2,FLOOR);
+    for(let r=VY1;r<=VY2;r++){set(r,VX1,WALL);set(r,VX2,WALL);}
+    for(let c=VX1;c<=VX2;c++){set(VY1,c,WALL);set(VY2,c,WALL);}
+    set(VY1,26,FLOOR);set(VY1,27,FLOOR);
+    // Survivor huts
+    rect(91,13,101,23,WALL);set(101,18,FLOOR);
+    rect(91,27,101,37,WALL);set(101,32,FLOOR);
+    rect(104,13,112,37,WALL);set(104,25,FLOOR);
+
+    // Dock (harbor to return home)
+    rect(55,3,70,10,FLOOR);
+    for(let c=3;c<=10;c++){set(55,c,WALL);set(70,c,WALL);}
+    for(let r=55;r<=70;r++){set(r,3,WALL);}
+    set(62,10,FLOOR);set(63,10,FLOOR);
+
+    // Dirt paths
+    for(let c=4;c<VX1;c++){set(99,c,DIRT);set(100,c,DIRT);}  // path to dock
+    for(let r=51;r<90;r++){set(r,50,DIRT);set(r,51,DIRT);}   // fortress to south
+    for(let r=38;r<45;r++){set(r,30,DIRT);set(r,31,DIRT);}   // caldera path
+
+    // Lava cracks (DIRT stripes through SAND)
+    for(let r=20;r<45;r+=5)
+      for(let c=55;c<110;c++)
+        if(Math.random()<0.3) map[r][c]=DIRT;
+
+    // Scattered rocks (MOUNTAIN single tiles)
+    for(let r=5;r<H-5;r++)
+      for(let c=5;c<W-5;c++)
+        if(Math.random()<0.015) map[r][c]=MOUNTAIN;
+
+    // Render
+    const tileKeys = ['tile_grass','tile_dirt','tile_water','tile_wall','tile_floor',
+                      'tile_tree','tile_mountain','tile_sand','tile_grave_grass'];
+    const blocking = [false,false,true,true,false,true,true,false,false];
+    this.wallGroup  = this.physics.add.staticGroup();
+    this.waterTiles = [];
+    for(let r=0;r<H;r++) for(let c=0;c<W;c++) {
+      const t = map[r][c];
+      const x = c*TILE+TILE/2, y = r*TILE+TILE/2;
+      const img = this.add.image(x,y,tileKeys[t]).setDepth(0);
+      // Tint SAND tiles orange-red for lava look, WATER tile deep red
+      if(t===SAND)  img.setTint(0xff6622);
+      if(t===WATER) img.setTint(0xff2200);
+      if(t===GRAVE_GRASS) img.setTint(0x554433);
+      if(blocking[t]){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.wallGroup.add(img);
+      }
+      if(t===WATER) this.waterTiles.push(img);
+    }
+    this.mapData = map;
+    window.GameState.mapData = map;
+    this.physics.world.setBounds(0,0,W*TILE,H*TILE);
+  }
+
+  // ── FROST WASTES MAP ──────────────────────────────────────────────────────
+
+  buildMap_frost() {
+    const W = 160, H = 120;
+    this.mapWidth  = W;
+    this.mapHeight = H;
+    this._islandSpawnTile = { x: 140, y: 60 };
+
+    const GRASS = 0, DIRT = 1, WATER = 2, WALL = 3, FLOOR = 4,
+          TREE = 5, MOUNTAIN = 6, SAND = 7, GRAVE_GRASS = 8;
+
+    const map = [];
+    for(let r=0;r<H;r++) map[r] = new Array(W).fill(GRASS);
+
+    const set = (r,c,t) => {if(r>=0&&r<H&&c>=0&&c<W) map[r][c]=t;};
+    const rect = (r0,c0,r1,c1,t) => {for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) set(r,c,t);};
+
+    // Ice/snow border
+    for(let r=0;r<H;r++)
+      for(let c=0;c<W;c++)
+        if(r<4||r>=H-4||c<4||c>=W-4) map[r][c]=MOUNTAIN;
+
+    // Frozen tundra base — GRAVE_GRASS as snow
+    for(let r=4;r<H-4;r++)
+      for(let c=4;c<W-4;c++)
+        if(Math.random()<0.7) map[r][c]=GRAVE_GRASS;
+
+    // Frozen lake — center (WATER = ice, tinted blue-white)
+    rect(40,40,80,120,WATER);
+    // Ice cracks (DIRT)
+    for(let r=42;r<79;r+=6)
+      for(let c=42;c<119;c++)
+        if(Math.random()<0.2) map[r][c]=DIRT;
+
+    // Glacial ruins — north-west
+    rect(8,8,35,55,FLOOR);
+    for(let r=8;r<=35;r++){set(r,8,WALL);set(r,55,WALL);}
+    for(let c=8;c<=55;c++){set(8,c,WALL);set(35,c,WALL);}
+    set(35,30,FLOOR);set(35,31,FLOOR);
+    // Ruin chambers
+    rect(10,10,22,28,WALL);set(22,19,FLOOR);
+    rect(10,32,22,53,WALL);set(22,42,FLOOR);
+    rect(26,10,33,53,WALL);set(26,31,FLOOR);
+
+    // Ice fortress — south (boss lair)
+    rect(82,55,112,140,FLOOR);
+    for(let r=82;r<=112;r++){set(r,55,WALL);set(r,140,WALL);}
+    for(let c=55;c<=140;c++){set(82,c,WALL);set(112,c,WALL);}
+    set(82,96,FLOOR);set(82,97,FLOOR);
+    // Fortress inner walls
+    rect(86,58,100,82,WALL);set(100,70,FLOOR);
+    rect(86,90,100,112,WALL);set(100,101,FLOOR);
+    rect(103,58,110,112,WALL);set(103,85,FLOOR);
+
+    // Survivor village — east coast
+    const VY1=30,VY2=65,VX1=130,VX2=155;
+    rect(VY1,VX1,VY2,VX2,FLOOR);
+    for(let r=VY1;r<=VY2;r++){set(r,VX1,WALL);set(r,VX2,WALL);}
+    for(let c=VX1;c<=VX2;c++){set(VY1,c,WALL);set(VY2,c,WALL);}
+    set(VY1,141,FLOOR);set(VY1,142,FLOOR);
+    // Huts
+    rect(33,133,44,143,WALL);set(44,138,FLOOR);
+    rect(48,133,60,143,WALL);set(48,138,FLOOR);
+    rect(33,147,44,153,WALL);set(44,150,FLOOR);
+
+    // Dock — east coast (harbor home)
+    rect(68,150,80,158,FLOOR);
+    for(let c=150;c<=158;c++){set(68,c,WALL);set(80,c,WALL);}
+    for(let r=68;r<=80;r++){set(r,158,WALL);}
+    set(74,150,FLOOR);set(75,150,FLOOR);
+
+    // Paths
+    for(let c=131;c<150;c++){set(48,c,DIRT);set(49,c,DIRT);}  // village to dock
+    for(let r=36;r<82;r++){set(r,97,DIRT);set(r,98,DIRT);}    // ruins to fortress
+    for(let r=66;r<82;r++){set(r,68,DIRT);set(r,69,DIRT);}    // lake approach
+
+    // Snow trees — sparse
+    for(let r=5;r<H-5;r++)
+      for(let c=5;c<W-5;c++)
+        if(Math.random()<0.025) map[r][c]=TREE;
+
+    // Scattered rocks
+    for(let r=5;r<H-5;r++)
+      for(let c=5;c<W-5;c++)
+        if(Math.random()<0.018) map[r][c]=MOUNTAIN;
+
+    // Render
+    const tileKeys = ['tile_grass','tile_dirt','tile_water','tile_wall','tile_floor',
+                      'tile_tree','tile_mountain','tile_sand','tile_grave_grass'];
+    const blocking = [false,false,true,true,false,true,true,false,false];
+    this.wallGroup  = this.physics.add.staticGroup();
+    this.waterTiles = [];
+    for(let r=0;r<H;r++) for(let c=0;c<W;c++) {
+      const t = map[r][c];
+      const x = c*TILE+TILE/2, y = r*TILE+TILE/2;
+      const img = this.add.image(x,y,tileKeys[t]).setDepth(0);
+      // Tint tiles for snow/ice look
+      if(t===GRASS)       img.setTint(0xddeeff);
+      if(t===GRAVE_GRASS) img.setTint(0xeef5ff);
+      if(t===WATER)       img.setTint(0x88aadd);
+      if(t===DIRT)        img.setTint(0xaabbcc);
+      if(t===TREE)        img.setTint(0x99bbcc);
+      if(blocking[t]){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.wallGroup.add(img);
+      }
+      if(t===WATER) this.waterTiles.push(img);
+    }
+    this.mapData = map;
+    window.GameState.mapData = map;
+    this.physics.world.setBounds(0,0,W*TILE,H*TILE);
+  }
+
   // ─────────────────── PLAYER ─────────────────────────────────────────────
 
   buildPlayer() {
-    const spawnX = 121 * TILE + TILE/2;
-    const spawnY = 76  * TILE + TILE/2;
+    // Spawn position depends on island
+    const st = this._islandSpawnTile || { x: 121, y: 76 };
+    const spawnX = st.x * TILE + TILE/2;
+    const spawnY = st.y * TILE + TILE/2;
     window.GameState.spawnX = spawnX;
     window.GameState.spawnY = spawnY;
 
@@ -750,6 +986,13 @@ class WorldScene extends Phaser.Scene {
   // ─────────────────── ENEMIES ────────────────────────────────────────────
 
   buildEnemies() {
+    const island = window.GameState.currentIsland || 0;
+    if (island === 1) { this.buildEnemies_inferno(); return; }
+    if (island === 2) { this.buildEnemies_frost();   return; }
+    this.buildEnemies_home();
+  }
+
+  buildEnemies_home() {
     this.enemyGroup = this.physics.add.group();
 
     const TINT = { weak: 0x44ff88, normal: 0x4488ff, hard: 0xff3322 };
@@ -844,7 +1087,7 @@ class WorldScene extends Phaser.Scene {
     this.physics.add.collider(this.enemyGroup, this.enemyGroup);
 
     this.physics.add.overlap(this.player, this.enemyGroup, (player, enemy) => {
-      if (this.battleCooldown) return;
+      if (this.battleCooldown || this._dialogueActive) return;
       this.battleCooldown = true;
       window.GameState.playerX = player.x;
       window.GameState.playerY = player.y;
@@ -853,7 +1096,123 @@ class WorldScene extends Phaser.Scene {
 
       this.physics.pause();
       this.cameras.main.flash(250, 200, 0, 0);
-      // Screen shake on battle start
+      this.cameras.main.shake(300, 0.008);
+      this.time.delayedCall(300, () => {
+        this.scene.launch('BattleScene', { enemy: enemy.enemyData });
+        this.scene.pause();
+      });
+    });
+  }
+
+  // ── INFERNO ISLAND ENEMIES ───────────────────────────────────────────────
+
+  buildEnemies_inferno() {
+    this.enemyGroup = this.physics.add.group();
+    const TINT = { weak: 0xff8844, normal: 0xff4422, hard: 0xff1100 };
+    const E = window.ENEMIES;
+    // Enemy indices: inf1=12, inf2=13, inf3=14, inf4=15, inf5=16, inf6=17, inf7(boss)=18
+    const inf = (n) => E[11 + n] || E[8];
+
+    const spawns = [
+      // Weak — starting area near dock
+      { x: 22*TILE, y: 50*TILE, ei_fn: () => inf(1) },
+      { x: 28*TILE, y: 45*TILE, ei_fn: () => inf(1) },
+      { x: 16*TILE, y: 42*TILE, ei_fn: () => inf(2) },
+      { x: 30*TILE, y: 55*TILE, ei_fn: () => inf(2) },
+      // Normal — lava plains
+      { x: 55*TILE, y: 30*TILE, ei_fn: () => inf(3) },
+      { x: 60*TILE, y: 40*TILE, ei_fn: () => inf(3) },
+      { x: 75*TILE, y: 25*TILE, ei_fn: () => inf(4) },
+      { x: 80*TILE, y: 38*TILE, ei_fn: () => inf(4) },
+      { x: 42*TILE, y: 28*TILE, ei_fn: () => inf(3) },
+      // Hard — caldera approaches
+      { x: 100*TILE, y: 40*TILE, ei_fn: () => inf(5) },
+      { x: 115*TILE, y: 50*TILE, ei_fn: () => inf(5) },
+      { x: 108*TILE, y: 30*TILE, ei_fn: () => inf(6) },
+      { x: 122*TILE, y: 36*TILE, ei_fn: () => inf(6) },
+      { x: 130*TILE, y: 28*TILE, ei_fn: () => inf(5) },
+      // Boss — inside caldera
+      { x: 130*TILE, y: 22*TILE, ei_fn: () => inf(7), spawnId: 'boss_inferno' },
+    ];
+
+    this._spawnEnemyList(spawns, TINT);
+  }
+
+  // ── FROST WASTES ENEMIES ──────────────────────────────────────────────────
+
+  buildEnemies_frost() {
+    this.enemyGroup = this.physics.add.group();
+    const TINT = { weak: 0x88ccff, normal: 0x4488ff, hard: 0x2244cc };
+    const E = window.ENEMIES;
+    // fr1=19, fr2=20, fr3=21, fr4=22, fr5=23, fr6=24, fr7(boss)=25
+    const fr = (n) => E[18 + n] || E[8];
+
+    const spawns = [
+      // Weak — east coast near dock
+      { x: 138*TILE, y: 55*TILE, ei_fn: () => fr(1) },
+      { x: 144*TILE, y: 48*TILE, ei_fn: () => fr(1) },
+      { x: 148*TILE, y: 62*TILE, ei_fn: () => fr(2) },
+      { x: 135*TILE, y: 40*TILE, ei_fn: () => fr(2) },
+      // Normal — frozen tundra
+      { x: 90*TILE, y: 30*TILE, ei_fn: () => fr(3) },
+      { x: 80*TILE, y: 25*TILE, ei_fn: () => fr(3) },
+      { x: 75*TILE, y: 38*TILE, ei_fn: () => fr(4) },
+      { x: 100*TILE, y: 22*TILE, ei_fn: () => fr(4) },
+      { x: 60*TILE, y: 30*TILE, ei_fn: () => fr(3) },
+      // Hard — ruins and lake edge
+      { x: 35*TILE, y: 20*TILE, ei_fn: () => fr(5) },
+      { x: 45*TILE, y: 30*TILE, ei_fn: () => fr(5) },
+      { x: 22*TILE, y: 25*TILE, ei_fn: () => fr(6) },
+      { x: 30*TILE, y: 15*TILE, ei_fn: () => fr(6) },
+      { x: 58*TILE, y: 20*TILE, ei_fn: () => fr(5) },
+      // Boss — ice fortress throne room
+      { x: 97*TILE, y: 97*TILE, ei_fn: () => fr(7), spawnId: 'boss_frost' },
+    ];
+
+    this._spawnEnemyList(spawns, TINT);
+  }
+
+  // ── Shared enemy spawn helper ─────────────────────────────────────────────
+
+  _spawnEnemyList(spawns, TINT) {
+    spawns.forEach(sp => {
+      const enemyDef = sp.ei_fn ? sp.ei_fn() : window.ENEMIES[sp.ei];
+      if (!enemyDef) return;
+      if (sp.x >= this.mapWidth * TILE || sp.y >= this.mapHeight * TILE) return;
+      const sprite = this.physics.add.sprite(sp.x, sp.y, enemyDef.sprite)
+        .setDepth(9).setCollideWorldBounds(true);
+      sprite.enemyData   = enemyDef;
+      sprite.spawnId     = sp.spawnId || null;
+      sprite.wanderTimer = Phaser.Math.Between(500, 2500);
+      sprite.setScale(1.2);
+      sprite.body.setSize(22, 22);
+
+      const diff = enemyDef.difficulty;
+      if (diff === 'boss') {
+        this.tweens.add({
+          targets: sprite, alpha: 0.7, scaleX: 1.35, scaleY: 1.35,
+          duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+        sprite.setTint(0xff0000);
+      } else {
+        const tint = TINT[diff];
+        if (tint) sprite.setTint(tint);
+      }
+
+      this.enemyGroup.add(sprite);
+    });
+
+    // Shared colliders
+    this.physics.add.collider(this.enemyGroup, this.wallGroup);
+    this.physics.add.collider(this.enemyGroup, this.enemyGroup);
+    this.physics.add.overlap(this.player, this.enemyGroup, (player, enemy) => {
+      if (this.battleCooldown || this._dialogueActive) return;
+      this.battleCooldown = true;
+      window.GameState.defeatedEnemy = enemy;
+      window.GameState.currentEnemy  = enemy.enemyData;
+      window.GameState.currentEnemySpawnId = enemy.spawnId || null;
+      this.physics.pause();
+      this.cameras.main.flash(250, 200, 0, 0);
       this.cameras.main.shake(300, 0.008);
       this.time.delayedCall(300, () => {
         this.scene.launch('BattleScene', { enemy: enemy.enemyData });
@@ -902,10 +1261,26 @@ class WorldScene extends Phaser.Scene {
   // ─────────────────── CAMPFIRES ──────────────────────────────────────────
 
   buildCampfires() {
+    const island = window.GameState.currentIsland || 0;
     this.campfires = [];
 
-    // Positions: near villages, key waypoints, dungeon entrances
-    const positions = [
+    let positions;
+    if (island === 1) {
+      positions = [
+        { x: 20*32+16, y: 62*32+16 },   // dock village
+        { x: 42*32+16, y: 60*32+16 },   // fortress approach
+        { x: 98*32+16, y: 60*32+16 },   // caldera approach
+        { x: 128*32+16, y: 40*32+16 },  // caldera camp
+      ];
+    } else if (island === 2) {
+      positions = [
+        { x: 140*32+16, y: 48*32+16 },  // east village
+        { x: 80*32+16,  y: 24*32+16 },  // frozen plains
+        { x: 50*32+16,  y: 22*32+16 },  // ruins approach
+        { x: 96*32+16,  y: 85*32+16 },  // ice fortress approach
+      ];
+    } else {
+      positions = [
       { x: 121*32+16, y: 76*32+16  },  // just north of main town (spawn area)
       { x: 100*32+16, y: 109*32+16 },  // inside main town west
       { x: 140*32+16, y: 109*32+16 },  // inside main town east
@@ -926,7 +1301,8 @@ class WorldScene extends Phaser.Scene {
       { x: 290*32+16, y: 106*32+16 },  // Eastern Harbor
       { x: 263*32+16, y:  18*32+16 },  // Volcano Peak interior
       { x: 214*32+16, y: 172*32+16 },  // Village 4 plaza
-    ];
+      ];
+    }
 
     positions.forEach(pos => {
       const sprite = this.add.sprite(pos.x, pos.y, 'campfire')
@@ -947,12 +1323,35 @@ class WorldScene extends Phaser.Scene {
   buildChests() {
     this.chests = [];
     this._openedChests = new Set();
+    const island = window.GameState.currentIsland || 0;
 
-    const RARE_CARDS = ['demon_019','demon_020','demon_021','demon_022','demon_023',
-                        'demon_030','demon_025','demon_036','demon_046','demon_066'];
+    // Island-specific rare card pools
+    const RARE_CARDS_HOME   = ['demon_019','demon_020','demon_021','demon_022','demon_023',
+                                'demon_030','demon_025','demon_031','demon_032','demon_033'];
+    const RARE_CARDS_INFERNO = ['demon_108','demon_109','demon_110','demon_111','spell_059',
+                                 'demon_019','demon_020','demon_030','demon_025','demon_021'];
+    const RARE_CARDS_FROST   = ['demon_114','demon_115','demon_116','demon_117','spell_060',
+                                 'spell_061','demon_019','demon_020','demon_030','demon_025'];
+    const RARE_CARDS = island===1 ? RARE_CARDS_INFERNO : island===2 ? RARE_CARDS_FROST : RARE_CARDS_HOME;
 
-    // Chests scattered across the world including new areas
-    const positions = [
+    let positions;
+    if (island === 1) {
+      positions = [
+        { x: 12*32+16, y: 43*32+16 }, { x: 48*32+16, y: 42*32+16 },
+        { x: 14*32+16, y: 77*32+16 }, { x: 48*32+16, y: 78*32+16 },
+        { x: 115*32+16, y: 15*32+16 }, { x: 144*32+16, y: 16*32+16 },
+        { x: 130*32+16, y: 28*32+16 },
+      ];
+    } else if (island === 2) {
+      positions = [
+        { x: 10*32+16, y: 12*32+16 }, { x: 52*32+16, y: 10*32+16 },
+        { x: 10*32+16, y: 32*32+16 }, { x: 52*32+16, y: 32*32+16 },
+        { x: 58*32+16, y: 108*32+16 }, { x: 138*32+16, y: 108*32+16 },
+        { x: 96*32+16, y: 110*32+16 },
+      ];
+    } else {
+    // Home island chests
+    positions = [
       // Dungeon 1 corners
       { x: 192*32+16, y:  10*32+16 }, { x: 228*32+16, y:  10*32+16 },
       { x: 192*32+16, y:  40*32+16 }, { x: 228*32+16, y:  40*32+16 },
@@ -983,6 +1382,7 @@ class WorldScene extends Phaser.Scene {
       // NEW: Village 4 area
       { x: 204*32+16, y: 170*32+16 }, { x: 225*32+16, y: 190*32+16 },
     ];
+    } // end island === 0
 
     positions.forEach((pos, idx) => {
       const sprite = this.add.sprite(pos.x, pos.y, 'chest')
@@ -1024,6 +1424,8 @@ class WorldScene extends Phaser.Scene {
   buildNPCs() {
     this.npcs = [];
     if (!window.QUESTS) return;
+    // NPCs only on home island for now (quest givers live there)
+    if ((window.GameState.currentIsland || 0) !== 0) return;
 
     // Deduplicate NPCs by pixel position (some quests share an NPC)
     const placed = new Map();
@@ -1088,8 +1490,35 @@ class WorldScene extends Phaser.Scene {
 
   buildPoneglyphs() {
     this.poneglyphs = [];
+    const island = window.GameState.currentIsland || 0;
 
-    // 5 poneglyph stones, each with a fragment of the hidden lore
+    // Island-specific lore stones
+    if (island === 1) {
+      const infraLore = [
+        { x: 128*32+16, y: 17*32+16, text: '"This island was the first to burn.\nNot from the volcano. From the war.\nThe Last Council held their final vote here.\nThey chose humanity. They chose the end.\nThey chose everything." — Inferno Stone I' },
+        { x: 48*32+16,  y: 44*32+16, text: '"The fire demons did not lose. They became.\nEvery human born on this island carries lava in their blood.\nThey just forgot the word for it." — Inferno Stone II' },
+      ];
+      infraLore.forEach(pg => {
+        const sprite = this.add.sprite(pg.x, pg.y, 'poneglyph').setDepth(8).setScale(0.8).setTint(0xff6622);
+        sprite.pgText = pg.text; sprite.pgRead = false;
+        this.poneglyphs.push(sprite);
+      });
+      return;
+    }
+    if (island === 2) {
+      const frostLore = [
+        { x: 50*32+16, y: 12*32+16, text: '"The ice remembers what the fire forgot.\nThe Sealing happened in winter. The god did not scream.\nIt whispered. One word. We still do not know what it meant." — Frost Stone I' },
+        { x: 96*32+16, y: 90*32+16, text: '"Seven humans sat in a circle.\nSeven cards face down.\nWhen they turned them over, the world changed.\nOne card was missing. Roger found it." — Frost Stone II' },
+      ];
+      frostLore.forEach(pg => {
+        const sprite = this.add.sprite(pg.x, pg.y, 'poneglyph').setDepth(8).setScale(0.8).setTint(0x88aadd);
+        sprite.pgText = pg.text; sprite.pgRead = false;
+        this.poneglyphs.push(sprite);
+      });
+      return;
+    }
+
+    // Home island — 5 poneglyph stones, each with a fragment of the hidden lore
     const stones = [
       {
         tx: 120, ty: 80,    // Just north of main town gate
@@ -1132,30 +1561,53 @@ class WorldScene extends Phaser.Scene {
   // ─────────────────── BOAT ────────────────────────────────────────────────
 
   buildBoat() {
-    // The boat sits in the Eastern Harbor — a teaser for island travel
-    const bx = 296 * TILE + TILE/2;
-    const by = 110 * TILE + TILE/2;
+    const island = window.GameState.currentIsland || 0;
 
-    this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
-
-    // Gentle bob
-    this.tweens.add({
-      targets: this.boatSprite,
-      y: by + 5,
-      duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-    });
-
-    // Harbor master NPC next to boat
-    const npcSprite = this.add.sprite(bx - 40, by - 10, 'npc').setDepth(10).setScale(1.0);
-    this.tweens.add({ targets: npcSprite, y: by - 16, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.add.text(bx - 40, by - 36, 'Harbor Master', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#88ccff',
-      stroke: '#000', strokeThickness: 2,
-      backgroundColor: '#00000066', padding: { x: 3, y: 1 },
-    }).setDepth(11).setOrigin(0.5);
-
-    // Store for interaction
-    this.harborMasterPos = { x: bx - 40, y: by - 10 };
+    // Home island: harbor at Eastern Harbor
+    if (island === 0) {
+      const bx = 296 * TILE + TILE/2;
+      const by = 110 * TILE + TILE/2;
+      this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
+      this.tweens.add({ targets: this.boatSprite, y: by+5, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const npcSprite = this.add.sprite(bx-40, by-10, 'npc').setDepth(10).setScale(1.0);
+      this.tweens.add({ targets: npcSprite, y: by-16, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.add.text(bx-40, by-36, 'Harbor Master', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#88ccff',
+        stroke: '#000', strokeThickness: 2,
+        backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+      }).setDepth(11).setOrigin(0.5);
+      this.harborMasterPos = { x: bx-40, y: by-10, isHomeHarbor: true };
+    }
+    // Inferno Island: dock on west coast
+    else if (island === 1) {
+      const bx = 6 * TILE + TILE/2;
+      const by = 63 * TILE + TILE/2;
+      this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
+      this.tweens.add({ targets: this.boatSprite, y: by+5, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const npcSprite = this.add.sprite(bx+40, by-10, 'npc').setDepth(10).setScale(1.0);
+      this.tweens.add({ targets: npcSprite, y: by-16, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.add.text(bx+40, by-36, 'Harbor Master', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#ff9966',
+        stroke: '#000', strokeThickness: 2,
+        backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+      }).setDepth(11).setOrigin(0.5);
+      this.harborMasterPos = { x: bx+40, y: by-10, isHomeHarbor: false };
+    }
+    // Frost Wastes: dock on east coast
+    else if (island === 2) {
+      const bx = 156 * TILE + TILE/2;
+      const by = 74 * TILE + TILE/2;
+      this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
+      this.tweens.add({ targets: this.boatSprite, y: by+5, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const npcSprite = this.add.sprite(bx-40, by-10, 'npc').setDepth(10).setScale(1.0);
+      this.tweens.add({ targets: npcSprite, y: by-16, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.add.text(bx-40, by-36, 'Harbor Master', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#88ccff',
+        stroke: '#000', strokeThickness: 2,
+        backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+      }).setDepth(11).setOrigin(0.5);
+      this.harborMasterPos = { x: bx-40, y: by-10, isHomeHarbor: false };
+    }
   }
 
   // ─────────────────── ANIMALS ────────────────────────────────────────────
@@ -1530,33 +1982,107 @@ class WorldScene extends Phaser.Scene {
     if (this._dialogueActive) return;
     this._dialogueActive = true;
 
+    const currentIsland = window.GameState.currentIsland || 0;
     const cx = this.cameras.main.scrollX + 480;
-    const cy = this.cameras.main.scrollY + 500;
-    const W = 680, H = 95;
-    const bg = this.add.graphics().setDepth(300);
-    bg.fillStyle(0x001020, 0.95); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
-    bg.lineStyle(2, 0x3388cc); bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    const cy = this.cameras.main.scrollY + 320;
+    const W = 680, H = 220;
 
-    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 8, 'Harbor Master Kael', {
+    const bg = this.add.graphics().setDepth(300);
+    bg.fillStyle(0x001020, 0.97); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    bg.lineStyle(2, 0x3388cc);   bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+
+    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 10, 'Harbor Master Kael', {
       fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#55aaff',
     }).setDepth(301);
 
-    const msg = '"The sea beyond this harbor leads to islands no one has mapped in twenty years.\nRoger sailed them all. Said each island had its own kind of cards — born from the land itself.\nI\'m refitting the ship. Come back when you\'re stronger. This route is not for the faint of heart."';
-    const bodyT = this.add.text(cx - W/2 + 14, cy - H/2 + 28, msg, {
-      fontSize: '10px', fontFamily: 'monospace', color: '#aaccee',
-      wordWrap: { width: W - 28 }, fontStyle: 'italic',
-    }).setDepth(301);
+    const allObjs = [bg, nameT];
 
-    const hint = this.add.text(cx + W/2 - 10, cy + H/2 - 8, '[F] close', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#334455',
-    }).setDepth(301).setOrigin(1, 1);
+    if (currentIsland === 0) {
+      // On home island — offer travel
+      const introT = this.add.text(cx - W/2 + 14, cy - H/2 + 32,
+        '"The ship is ready. Roger sailed every one of these waters.\nEach island has its own demons. Its own truth. Where do you go?"', {
+          fontSize: '11px', fontFamily: 'monospace', fontStyle: 'italic', color: '#aaccee',
+          wordWrap: { width: W - 28 },
+        }).setDepth(301);
+      allObjs.push(introT);
+
+      const islands = [
+        { id: 1, label: '⚔  INFERNO ISLAND', sub: 'Volcanic. Fire demons. Dangerous.', color: '#ff8844', hov: '#ffaa66' },
+        { id: 2, label: '❄  FROST WASTES',  sub: 'Frozen tundra. Ice beasts. Ancient ruins.', color: '#88ccff', hov: '#aaddff' },
+      ];
+
+      islands.forEach((isl, k) => {
+        const btnY = cy - H/2 + 100 + k * 52;
+        const btn = this.add.text(cx, btnY, isl.label, {
+          fontSize: '18px', fontFamily: 'monospace', fontStyle: 'bold',
+          color: isl.color, stroke: '#000', strokeThickness: 3,
+          backgroundColor: '#001122', padding: { x: 20, y: 8 },
+        }).setOrigin(0.5).setDepth(302).setInteractive({ useHandCursor: true });
+        const subT = this.add.text(cx, btnY + 28, isl.sub, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#667788', fontStyle: 'italic',
+        }).setOrigin(0.5).setDepth(302);
+        btn.on('pointerover', () => btn.setStyle({ color: isl.hov, backgroundColor: '#002244' }));
+        btn.on('pointerout',  () => btn.setStyle({ color: isl.color, backgroundColor: '#001122' }));
+        btn.on('pointerdown', () => {
+          allObjs.forEach(o => o.destroy()); btn.destroy(); subT.destroy();
+          this._dialogueActive = false;
+          this._travelToIsland(isl.id);
+        });
+        allObjs.push(btn, subT);
+      });
+
+      const cancelT = this.add.text(cx + W/2 - 14, cy + H/2 - 10, '[F] stay', {
+        fontSize: '10px', fontFamily: 'monospace', color: '#334455',
+      }).setOrigin(1, 1).setDepth(301);
+      allObjs.push(cancelT);
+
+    } else {
+      // On another island — offer return home
+      const introT = this.add.text(cx - W/2 + 14, cy - H/2 + 32,
+        '"Ready to head back to the home island?\nYour loot and cards travel with you."', {
+          fontSize: '12px', fontFamily: 'monospace', color: '#aaccee',
+          wordWrap: { width: W - 28 },
+        }).setDepth(301);
+      allObjs.push(introT);
+
+      const btnHome = this.add.text(cx, cy, '⛵  SAIL HOME', {
+        fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: '#ffd700', stroke: '#000', strokeThickness: 3,
+        backgroundColor: '#001122', padding: { x: 24, y: 10 },
+      }).setOrigin(0.5).setDepth(302).setInteractive({ useHandCursor: true });
+      btnHome.on('pointerover', () => btnHome.setStyle({ color: '#ffee88', backgroundColor: '#002244' }));
+      btnHome.on('pointerout',  () => btnHome.setStyle({ color: '#ffd700', backgroundColor: '#001122' }));
+      btnHome.on('pointerdown', () => {
+        allObjs.forEach(o => o.destroy()); btnHome.destroy();
+        this._dialogueActive = false;
+        this._travelToIsland(0);
+      });
+      allObjs.push(btnHome);
+
+      const cancelT = this.add.text(cx + W/2 - 14, cy + H/2 - 10, '[F] stay', {
+        fontSize: '10px', fontFamily: 'monospace', color: '#334455',
+      }).setOrigin(1, 1).setDepth(301);
+      allObjs.push(cancelT);
+    }
 
     const close = () => {
-      [bg, nameT, bodyT, hint].forEach(o => o.destroy());
+      allObjs.forEach(o => { if (o && o.destroy) o.destroy(); });
       this._dialogueActive = false;
     };
     this.input.keyboard.once('keydown-F', close);
-    this.time.delayedCall(7000, () => { if (this._dialogueActive) close(); });
+  }
+
+  _travelToIsland(dest) {
+    if (!window.GameState.visitedIslands) window.GameState.visitedIslands = [0];
+    if (!window.GameState.visitedIslands.includes(dest)) {
+      window.GameState.visitedIslands.push(dest);
+    }
+    this.physics.pause();
+    this.cameras.main.fadeOut(800, 0, 0, 0);
+    this.time.delayedCall(850, () => {
+      this.scene.stop('HUDScene');
+      this.scene.start('SeaScene', { destination: dest });
+    });
   }
 
   // ── NPC dialogue ──────────────────────────────────────────────────────────
@@ -1727,9 +2253,73 @@ class WorldScene extends Phaser.Scene {
     this.showMessage('Dismounted', '#aaaaaa');
   }
 
+  // ─────────────────── WEATHER ────────────────────────────────────────────
+
+  _updateWeather(delta) {
+    if (!this._weatherGfx || !this.player) return;
+    this._weatherTimer += delta;
+    if (this._weatherTimer < 80) return;  // ~12 fps for weather
+    this._weatherTimer = 0;
+
+    const island = window.GameState.currentIsland || 0;
+    const pr = Math.floor(this.player.y / TILE);
+    const pc = Math.floor(this.player.x / TILE);
+
+    // Determine weather type from biome
+    let weatherType = 'none';
+    if (island === 2) {
+      weatherType = 'snow';        // always snowing on frost island
+    } else if (island === 1) {
+      weatherType = 'ash';         // ash particles on inferno island
+    } else if (pr > 140 && pc < 65) {
+      weatherType = 'rain';        // swamp biome
+    } else if (pc > 190 && pr < 140) {
+      weatherType = 'sand';        // desert biome
+    }
+
+    if (weatherType === 'none') {
+      this._weatherGfx.clear();
+      return;
+    }
+
+    const gfx = this._weatherGfx;
+    gfx.clear();
+
+    // GBA-style pixel weather — simple 1-2px dots
+    const W = 960, H = 640;
+    const COUNT = weatherType === 'rain' ? 40 : 25;
+
+    for (let k = 0; k < COUNT; k++) {
+      const t = (time * 0.001 + k * 0.7) % 1.0;
+      const seed = k * 137.5 + 1;
+      const bx = ((seed * 0.7) % 1.0) * W;
+      const by = (t * H * 1.4) % H;
+
+      switch (weatherType) {
+        case 'rain':
+          gfx.fillStyle(0x4488aa, 0.8);
+          gfx.fillRect(Math.floor(bx), Math.floor(by), 1, 4);   // vertical streak
+          break;
+        case 'snow':
+          gfx.fillStyle(0xeef5ff, 0.9);
+          gfx.fillRect(Math.floor(bx + Math.sin(t*10+k)*6), Math.floor(by), 2, 2);
+          break;
+        case 'ash':
+          gfx.fillStyle(0x886655, 0.7);
+          gfx.fillRect(Math.floor(bx + Math.sin(t*8+k)*8), Math.floor(by), 2, 2);
+          break;
+        case 'sand':
+          gfx.fillStyle(0xcc9944, 0.5);
+          gfx.fillRect(Math.floor(bx), Math.floor(by), 1, 1);  // tiny grain
+          break;
+      }
+    }
+  }
+
   // ─────────────────── UPDATE ─────────────────────────────────────────────
 
   update(time, delta) {
+    this._updateWeather(delta);
     const baseSpeed   = 200;
     const mountSpeed  = 600;
     const speed       = this.mountedHorse ? mountSpeed : baseSpeed;

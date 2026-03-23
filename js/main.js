@@ -28,6 +28,9 @@ window.resetGameState = function() {
     hardKills:        0,
     chestsOpened:     0,
     currentEnemySpawnId: null,
+    // Island system
+    currentIsland:    0,
+    visitedIslands:   [0],
   };
 };
 
@@ -51,6 +54,8 @@ window.saveGame = function() {
       totalKills:     gs.totalKills || 0,
       hardKills:      gs.hardKills  || 0,
       chestsOpened:   gs.chestsOpened || 0,
+      currentIsland:  gs.currentIsland || 0,
+      visitedIslands: gs.visitedIslands || [0],
       savedAt:        Date.now(),
     };
     localStorage.setItem('blooddungeon_save', JSON.stringify(data));
@@ -84,6 +89,8 @@ window.loadGame = function() {
     gs.totalKills       = data.totalKills      ?? 0;
     gs.hardKills        = data.hardKills       ?? 0;
     gs.chestsOpened     = data.chestsOpened    ?? 0;
+    gs.currentIsland    = data.currentIsland   ?? 0;
+    gs.visitedIslands   = data.visitedIslands  ?? [0];
     return true;
   } catch(e) {
     console.warn('Load failed:', e);
@@ -110,7 +117,7 @@ const config = {
     default: 'arcade',
     arcade:  { gravity: { y: 0 }, debug: false },
   },
-  scene: [TitleScene, PreloadScene, WorldScene, BattleScene, HUDScene, MenuScene],
+  scene: [TitleScene, PreloadScene, SeaScene, WorldScene, BattleScene, HUDScene, MenuScene],
 };
 
 new Phaser.Game(config);

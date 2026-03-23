@@ -644,6 +644,105 @@ window.CARDS = [
   { id: 'spell_056', name: 'Cursed Ground',    type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',      effect: 'debuff_atk_all',     value: 2,  desc: 'All enemy demons lose 2 ATK.' },
   { id: 'spell_057', name: 'Arcane Mastery',   type: 'spell', cost: 0, manaValue: 1, rarity: 'legendary', effect: 'double_next_spell',  value: 0,  desc: 'Your next spell this turn is cast twice.' },
   { id: 'spell_058', name: 'Soul Link',        type: 'spell', cost: 1, manaValue: 1, rarity: 'rare',      effect: 'deal_face_drain',    value: 2,  desc: 'Deal 2 to the enemy. Gain 2 HP.' },
+
+  // ══════════════════════════════════════════════════════
+  //  INFERNO ISLAND — fire demons
+  // ══════════════════════════════════════════════════════
+  {
+    id: 'demon_106', name: 'Lava Imp', subtype: 'fire', type: 'demon',
+    cost: 1, manaValue: 1, atk: 2, hp: 1, rarity: 'common',
+    ability: 'haste',
+    abilityDesc: 'Haste — can attack immediately.',
+    desc: 'Born screaming from a volcanic vent.',
+  },
+  {
+    id: 'demon_107', name: 'Cinder Hound', subtype: 'fire', type: 'demon',
+    cost: 2, manaValue: 1, atk: 3, hp: 2, rarity: 'common',
+    ability: 'haste_poisonous',
+    abilityDesc: 'Haste. Poisonous — kills any demon it damages.',
+    desc: 'Ash in its lungs. Fire in its bite.',
+  },
+  {
+    id: 'demon_108', name: 'Magma Golem', subtype: 'fire', type: 'demon',
+    cost: 3, manaValue: 1, atk: 2, hp: 6, rarity: 'uncommon',
+    ability: 'taunt',
+    abilityDesc: 'Taunt — enemies must attack this first.',
+    desc: 'Hardened lava given purpose.',
+  },
+  {
+    id: 'demon_109', name: 'Inferno Drake', subtype: 'fire', type: 'demon',
+    cost: 3, manaValue: 1, atk: 5, hp: 2, rarity: 'rare',
+    ability: 'haste',
+    abilityDesc: 'Haste — can attack immediately.',
+    desc: 'Dives and burns before you can blink.',
+  },
+  {
+    id: 'demon_110', name: 'Ember Phoenix', subtype: 'fire', type: 'demon',
+    cost: 4, manaValue: 1, atk: 4, hp: 4, rarity: 'rare',
+    ability: 'deathrattle_summon_zombie',
+    abilityDesc: 'Deathrattle: Summon a 2/2 Ash Wraith when destroyed.',
+    desc: 'Death is not the end. It never was on this island.',
+  },
+  {
+    id: 'demon_111', name: 'Volcano Lord', subtype: 'fire', type: 'demon',
+    cost: 4, manaValue: 1, atk: 5, hp: 5, rarity: 'mythic',
+    ability: 'battlecry_damage_player_2',
+    abilityDesc: 'Battlecry: Deal 2 damage to the enemy.',
+    desc: '"The mountain speaks. You will not like what it says." — Magma King',
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  FROST WASTES — ice/beast demons
+  // ══════════════════════════════════════════════════════
+  {
+    id: 'demon_112', name: 'Frost Rat', subtype: 'beast', type: 'demon',
+    cost: 1, manaValue: 1, atk: 1, hp: 2, rarity: 'common',
+    ability: 'poisonous',
+    abilityDesc: 'Poisonous — kills any demon it damages.',
+    desc: 'Its bite freezes the blood solid.',
+  },
+  {
+    id: 'demon_113', name: 'Blizzard Imp', subtype: 'beast', type: 'demon',
+    cost: 1, manaValue: 1, atk: 2, hp: 1, rarity: 'common',
+    ability: 'haste',
+    abilityDesc: 'Haste — can attack immediately.',
+    desc: 'Moves through snow like it is not there.',
+  },
+  {
+    id: 'demon_114', name: 'Glacier Drake', subtype: 'beast', type: 'demon',
+    cost: 2, manaValue: 1, atk: 2, hp: 5, rarity: 'uncommon',
+    ability: 'taunt',
+    abilityDesc: 'Taunt — enemies must attack this first.',
+    desc: 'An ancient predator. Older than the ice itself.',
+  },
+  {
+    id: 'demon_115', name: 'Frost Wraith', subtype: 'beast', type: 'demon',
+    cost: 3, manaValue: 1, atk: 3, hp: 3, rarity: 'uncommon',
+    ability: 'unblockable',
+    abilityDesc: 'Unblockable — can always attack the enemy directly.',
+    desc: 'Cold beyond cold. A draft that kills.',
+  },
+  {
+    id: 'demon_116', name: 'Permafrost Titan', subtype: 'beast', type: 'demon',
+    cost: 4, manaValue: 1, atk: 4, hp: 7, rarity: 'rare',
+    ability: 'taunt',
+    abilityDesc: 'Taunt — enemies must attack this first.',
+    desc: 'The north does not move. The north waits.',
+  },
+  {
+    id: 'demon_117', name: 'Glacial Sovereign', subtype: 'beast', type: 'demon',
+    cost: 4, manaValue: 1, atk: 6, hp: 4, rarity: 'mythic',
+    ability: 'battlecry_aoe_1',
+    abilityDesc: 'Battlecry: Deal 1 damage to all enemy demons.',
+    desc: '"The Final Council met here. In the cold. Before everything ended." — Fragment VII, Frost Inscription',
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  INFERNO ISLAND & FROST WASTES — new spells
+  // ══════════════════════════════════════════════════════
+  { id: 'spell_059', name: 'Magma Burst',  type: 'spell', cost: 2, manaValue: 1, rarity: 'rare',      effect: 'damage',    value: 5, desc: 'Deal 5 damage. The volcano does not miss.' },
+  { id: 'spell_060', name: 'Blizzard',     type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',      effect: 'aoe_enemy', value: 3, desc: 'Deal 3 damage to all enemy demons. Even the undead feel cold.' },
+  { id: 'spell_061', name: 'Lava Shield',  type: 'spell', cost: 1, manaValue: 1, rarity: 'uncommon',  effect: 'buff_hp',   value: 4, desc: 'Give a friendly demon +4 HP. Hardened from within.' },
 ];
 
 window.CARD_MAP = {};
