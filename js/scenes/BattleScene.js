@@ -431,61 +431,76 @@ class BattleScene extends Phaser.Scene {
   runEnemyTurn(isFirstTurn = false) {
     this.enemyFront.forEach(d => d.exhausted = false);
     this.enemyRear.forEach(d => d.exhausted = false);
-    let mana = (isFirstTurn && this.playerGoesFirst) ? 1 : 0;
-
-    const totalPossibleMana = mana + this.enemyHand.reduce((s, c) => s + (c.manaValue || 1), 0);
-    const totalEnemyOnBoard = this.enemyFront.length + this.enemyRear.length;
 
     // tax_spells: player's Iron Warden raises enemy spell costs by 1
     const taxed = [...this.playerFront, ...this.playerRear].some(d => d.ability === 'tax_spells') ? 1 : 0;
-    let target = this.enemyHand
-      .filter(c => c.type === 'demon' && c.cost <= totalPossibleMana && totalEnemyOnBoard < 8)
-      .sort((a, b) => b.cost - a.cost)[0];
-    if (!target) target = this.enemyHand
-      .filter(c => c.type === 'spell' && (c.cost + taxed) <= totalPossibleMana)
-      .sort((a, b) => b.cost - a.cost)[0];
 
-    [...this.enemyHand].filter(c => c !== target).forEach(c => {
-      mana += c.manaValue || 1;
+    // ── Smart multi-card AI ───────────────────────────────────────────────
+    // Budget = bonusMana + sum(all manaValues). Each card played costs (cost + manaValue)
+    // because it can no longer be pitched. Cap at 2 plays per turn for balance.
+    const bonusMana = (isFirstTurn && this.playerGoesFirst) ? 1 : 0;
+    let budget = bonusMana + this.enemyHand.reduce((s, c) => s + (c.manaValue || 1), 0);
+
+    // Sort: demons first (expensive → cheap), then spells (expensive → cheap)
+    const candidates = [...this.enemyHand].sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'demon' ? -1 : 1;
+      const aCost = a.type === 'spell' ? a.cost + taxed : a.cost;
+      const bCost = b.type === 'spell' ? b.cost + taxed : b.cost;
+      return bCost - aCost;
+    });
+
+    const toPlay = [];
+    let demonsSummoned = 0;
+    for (const card of candidates) {
+      if (toPlay.length >= 2) break;
+      const effectiveCost = card.type === 'spell' ? card.cost + taxed : card.cost;
+      const netCost = effectiveCost + (card.manaValue || 1); // cost + lost pitch value
+      if (netCost > budget) continue;
+      if (card.type === 'demon') {
+        const onBoard = this.enemyFront.length + this.enemyRear.length + demonsSummoned;
+        if (onBoard >= 8) continue;
+        demonsSummoned++;
+      }
+      toPlay.push(card);
+      budget -= netCost;
+    }
+
+    // Pitch all cards not selected to play
+    [...this.enemyHand].filter(c => !toPlay.includes(c)).forEach(c => {
       this.enemyHand.splice(this.enemyHand.indexOf(c), 1);
       this.enemyGraveyard.push(c);
     });
 
-    if (target && target.cost <= mana) {
-      mana -= target.cost;
-      this.enemyHand.splice(this.enemyHand.indexOf(target), 1);
-      if (target.type === 'demon') {
+    // Play selected cards
+    for (const card of toPlay) {
+      this.enemyHand.splice(this.enemyHand.indexOf(card), 1);
+      if (card.type === 'demon') {
         // AI placement logic
         let targetRow;
-        const hasTaunt = target.ability && target.ability.includes('taunt');
+        const hasTaunt = card.ability && card.ability.includes('taunt');
         if (hasTaunt) {
-          // Taunt always front
           targetRow = this.enemyFront.length < 4 ? this.enemyFront : this.enemyRear;
         } else if (this.enemyFront.length >= 4) {
           targetRow = this.enemyRear;
         } else if (this.enemyFront.length < 2) {
           targetRow = this.enemyFront;
         } else {
-          // Prefer rear for low HP, front for high ATK
-          const isLowHp  = target.hp < 3;
-          const isHighAtk = target.atk >= 4;
+          const isLowHp  = card.hp < 3;
+          const isHighAtk = card.atk >= 4;
           targetRow = (isLowHp && !isHighAtk) ? this.enemyRear : this.enemyFront;
         }
         if (targetRow.length >= 4) targetRow = targetRow === this.enemyFront ? this.enemyRear : this.enemyFront;
         if (targetRow.length < 4) {
-          const demon = { ...target, currentHp: target.hp, currentAtk: target.atk, exhausted: !(target.ability && target.ability.includes('haste')), divineShield: !!(target.ability && target.ability.includes('divine_shield')) };
+          const demon = { ...card, currentHp: card.hp, currentAtk: card.atk, exhausted: !(card.ability && card.ability.includes('haste')), divineShield: !!(card.ability && card.ability.includes('divine_shield')) };
           targetRow.push(demon);
-          this.addLog('Enemy plays ' + target.name + ' to ' + (targetRow === this.enemyFront ? 'front' : 'rear'), '#ff8888');
-          this.resolveDemonBattlecry(target, 'enemy');
+          this.addLog('Enemy plays ' + card.name + ' to ' + (targetRow === this.enemyFront ? 'front' : 'rear'), '#ff8888');
+          this.resolveDemonBattlecry(card, 'enemy');
         }
       } else {
-        this.addLog('Enemy casts ' + target.name, '#ffaaaa');
-        this.resolveSpell(target, 'enemy');
-        this.enemyGraveyard.push(target);
+        this.addLog('Enemy casts ' + card.name, '#ffaaaa');
+        this.resolveSpell(card, 'enemy');
+        this.enemyGraveyard.push(card);
       }
-    } else if (target) {
-      this.enemyHand.splice(this.enemyHand.indexOf(target), 1);
-      this.enemyGraveyard.push(target);
     }
 
     this.enemyGraveyard.push(...this.enemyHand);
@@ -1905,6 +1920,18 @@ class BattleScene extends Phaser.Scene {
         color: { common:'#888888', uncommon:'#cccccc', rare:'#2266cc', mythic:'#9933cc', legendary:'#ff6600' }[card.rarity] || '#888888'
       }).setOrigin(0.5, 1).setDepth(25.1)
     );
+
+    // Forge badge in zoom panel
+    const zForge = (window.GameState?.upgradedCards?.[card.id] || 0);
+    if (zForge > 0 && card.type === 'demon') {
+      const zfbg = this.add.graphics().setDepth(25.3);
+      zfbg.fillStyle(0xff6600); zfbg.fillRect(px+W/2-34, py-H/2, 34, 20);
+      this._zoomObjs.push(zfbg,
+        this.add.text(px+W/2-17, py-H/2+10, 'FORGED +'+zForge, {
+          fontSize: '9px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
+        }).setOrigin(0.5).setDepth(25.4)
+      );
+    }
   }
 
   hideZoom() {
@@ -2110,6 +2137,18 @@ class BattleScene extends Phaser.Scene {
           fontSize:'9px', fontFamily:'monospace',
           color: this.abilityColor(card.ability)
         }).setOrigin(0.5).setDepth(DEPTH+.2).setAlpha(alpha)
+      );
+    }
+
+    // Forge badge: show "+X" for upgraded demon cards
+    const forgeCount = (window.GameState?.upgradedCards?.[card.id] || 0);
+    if (forgeCount > 0 && card.type === 'demon') {
+      const fbg = this.add.graphics().setDepth(DEPTH+.3).setAlpha(alpha);
+      fbg.fillStyle(0xff6600); fbg.fillRect(cx+W/2-20, cy-H/2, 20, 14);
+      this._handObjs.push(fbg,
+        this.add.text(cx+W/2-10, cy-H/2+7, '+'+forgeCount, {
+          fontSize:'9px', fontFamily:'monospace', fontStyle:'bold', color:'#ffffff'
+        }).setOrigin(0.5).setDepth(DEPTH+.4).setAlpha(alpha)
       );
     }
 
@@ -2378,6 +2417,21 @@ class BattleScene extends Phaser.Scene {
     if (demon.exhausted) {
       arr.push(this.add.text(cx, cy, 'ZZZ', { fontSize:'12px', fontFamily:'monospace', color:'#666688' }).setOrigin(0.5).setDepth(DEPTH+.3));
     }
+
+    // Forge badge on player demons
+    if (!isEnemy) {
+      const boardForge = (window.GameState?.upgradedCards?.[demon.id] || 0);
+      if (boardForge > 0) {
+        const fbg = this.add.graphics().setDepth(DEPTH+.3);
+        fbg.fillStyle(0xff6600); fbg.fillRect(cx+W/2-18, cy-H/2, 18, 12);
+        arr.push(fbg,
+          this.add.text(cx+W/2-9, cy-H/2+6, '+'+boardForge, {
+            fontSize:'8px', fontFamily:'monospace', fontStyle:'bold', color:'#ffffff'
+          }).setOrigin(0.5).setDepth(DEPTH+.4)
+        );
+      }
+    }
+
     if (isValidTarget) arr.push(this.add.text(cx, cy-H/2-12, '← TARGET', { fontSize:'10px', fontFamily:'monospace', color:'#ff4444' }).setOrigin(0.5).setDepth(DEPTH+.3));
     if (!isValidTarget && isTarget && rowType === 'rear') arr.push(this.add.text(cx, cy-H/2-12, 'PROTECTED', { fontSize:'9px', fontFamily:'monospace', color:'#555555' }).setOrigin(0.5).setDepth(DEPTH+.3));
     if (isAttacker) arr.push(this.add.text(cx, cy-H/2-12, '← ATTACKING', { fontSize:'10px', fontFamily:'monospace', color:'#ffff44' }).setOrigin(0.5).setDepth(DEPTH+.3));

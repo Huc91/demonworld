@@ -245,3 +245,43 @@ Press `M` or `ESC` in the overworld to open the menu. Three tabs:
 - `_spawnEnemyList(spawns, TINT)` shared helper eliminates duplicate overlap/collider setup
 - Island camera backgrounds: `['#0a0a12', '#1a0800', '#050a14']` indexed by island
 - SeaScene resets `playerX/Y/checkpoint/explored/mapData` before WorldScene restart
+
+---
+
+## 2026-03-23 — Milestone 6: Combat Polish + AI Upgrade
+
+### Kill Streak System (WorldScene + BattleScene)
+- Track consecutive kills in `this._killStreak` on WorldScene
+- Streak bonuses: 3-kill=+10G, 5-kill=+25G, 10-kill=+50G (shown as world floating text)
+- Streak resets to 0 on battleLost
+- Victory screen shows "X-KILL STREAK" label (with 🔥 decorations at 5+ and 10+)
+- Color escalates: yellow → orange → red
+
+### Relic startMana Bug Fix (BattleScene)
+- Root cause: `startPlayerTurn(true)` was resetting `this.playerMana = 0` AFTER `create()` set the relic bonus
+- Fix: `startPlayerTurn(isFirst)` applies `_relicStartMana` only on `isFirst=true`, after the reset
+- Added float notification: "+X MANA (charm bonus)" when relic mana is applied
+
+### Forge / Upgrade Indicator Badge (BattleScene + MenuScene)
+- Orange "+X" badge on demon cards in hand (top-right corner)
+- Orange "+X" badge on player board demons (top-right corner)
+- "FORGED +X" badge in BattleScene zoom panel (top-right of preview frame)
+- Orange "+X" badge on mini-card in Collection view (bottom-left)
+- "FORGED +X" badge in MenuScene card preview panel (top-right)
+- Uses `window.GameState.upgradedCards[card.id]` — 0 means no badge shown
+
+### Smart Enemy AI (BattleScene)
+- Old: enemy pitched all-but-1 card, played at most 1 card per turn
+- New: budget = bonusMana + sum(all hand manaValues); each played card costs `card.cost + card.manaValue` from budget
+- Result: enemy can play 2 cards per turn when the math works (e.g. two 1-cost cards = much more threatening)
+- Sort order: most expensive demon first, then most expensive spell (spells respect tax_spells penalty)
+- Cap: 2 plays per turn for balance (avoids overwhelming the player)
+
+### Enemy Chase AI (WorldScene)
+- Old: only boss enemies chased, and only 35% of the time, with a 1600px range
+- New: normal enemies chase within 8 tiles (280px), 50% chance per wander tick; bosses within 50 tiles (1600px), 60% chance or always if within 4 tiles
+- Makes the world feel alive and dangerous — enemies hunt you down instead of wandering past
+
+### Architecture Notes
+- Forge badge rendering extracted as inline guards (`forgeCount > 0 && card.type === 'demon'`) — simple, no new helpers
+- Chase logic is checked before the wander timer, so it fires immediately when player enters range

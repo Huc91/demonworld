@@ -194,6 +194,18 @@ class MenuScene extends Phaser.Scene {
         color: rarityColor[card.rarity] || '#888888'
       }).setOrigin(0.5, 1).setDepth(DEPTH + .1)
     );
+
+    // Forge badge in preview
+    const previewForge = (window.GameState?.upgradedCards?.[card.id] || 0);
+    if (previewForge > 0 && card.type === 'demon') {
+      const pfbg = this.add.graphics().setDepth(DEPTH + .2);
+      pfbg.fillStyle(0xff6600); pfbg.fillRect(px + W/2 - 46, py - H/2, 46, 20);
+      this._previewObjs.push(pfbg,
+        this.add.text(px + W/2 - 23, py - H/2 + 10, 'FORGED +' + previewForge, {
+          fontSize: '9px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
+        }).setOrigin(0.5).setDepth(DEPTH + .3)
+      );
+    }
   }
 
   hideCardPreview() {
@@ -328,6 +340,17 @@ class MenuScene extends Phaser.Scene {
       add(this.add.text(cx + W/2 - 3, cy - H/2 + 3, 'x' + count, {
         fontSize: '7px', fontFamily: 'monospace', color: '#aaaaaa'
       }).setOrigin(1, 0));
+    }
+
+    // Forge badge for upgraded demon cards
+    const forgeLevel = (window.GameState?.upgradedCards?.[card.id] || 0);
+    if (forgeLevel > 0 && card.type === 'demon') {
+      const fbg = this.add.graphics();
+      fbg.fillStyle(0xff6600); fbg.fillRect(cx - W/2, cy + H/2 - 12, 20, 12);
+      add(fbg);
+      add(this.add.text(cx - W/2 + 10, cy + H/2 - 6, '+' + forgeLevel, {
+        fontSize: '7px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
+      }).setOrigin(0.5));
     }
   }
 

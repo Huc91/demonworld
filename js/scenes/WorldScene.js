@@ -2654,23 +2654,30 @@ class WorldScene extends Phaser.Scene {
       this._handleInteract();
     }
 
-    // ── Enemy wander AI ───────────────────────────────────────────────────
+    // ── Enemy wander / chase AI ───────────────────────────────────────────
     this.enemyGroup.getChildren().forEach(enemy => {
+      const dx   = this.player.x - enemy.x;
+      const dy   = this.player.y - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      const isBoss   = enemy.enemyData.isBoss;
+      const spd      = enemy.enemyData.moveSpeed * (isBoss ? 0.7 : 1);
+      const chaseRange = isBoss ? 1600 : 280; // normal: ~8 tiles, boss: ~50 tiles
+
+      // Immediate chase if in range — no timer gate for bosses, smooth for normals
+      if (dist < chaseRange && !this.battleCooldown) {
+        const chaseChance = isBoss ? 0.6 : 0.5;
+        if (Math.random() < chaseChance || (isBoss && dist < 400)) {
+          const nx = dx / dist, ny = dy / dist;
+          const mult = isBoss ? 1.5 : 1.1;
+          enemy.setVelocity(nx * spd * mult, ny * spd * mult);
+          enemy.wanderTimer = isBoss ? 1500 : 800;
+          return;
+        }
+      }
+
       enemy.wanderTimer -= delta;
       if (enemy.wanderTimer <= 0) {
-        const isBoss = enemy.enemyData.isBoss;
-        const spd    = enemy.enemyData.moveSpeed * (isBoss ? 0.7 : 1);
-
-        if (isBoss && Math.random() < 0.35) {
-          const dx   = this.player.x - enemy.x;
-          const dy   = this.player.y - enemy.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 1600) {
-            enemy.setVelocity((dx / dist) * spd * 1.5, (dy / dist) * spd * 1.5);
-            enemy.wanderTimer = 1500;
-            return;
-          }
-        }
         if (Math.random() < 0.18) {
           enemy.setVelocity(0, 0);
           enemy.wanderTimer = Phaser.Math.Between(800, 2000);
