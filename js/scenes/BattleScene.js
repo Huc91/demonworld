@@ -62,6 +62,7 @@ class BattleScene extends Phaser.Scene {
     this._logScroll = 0;
     // Graveyard viewer
     this._gyObjs = [];
+    this._graveyardOpen = false;
 
     // Drag state
     this.dragInfo  = null;  // { card, handIdx }
@@ -162,8 +163,17 @@ class BattleScene extends Phaser.Scene {
     // Arsenal label
     this.add.text(917, 343, 'ARSENAL', { fontSize: '9px', fontFamily: 'monospace', color: '#445566' }).setOrigin(0.5, 0);
 
+    // ── Enemy HP bar ───────────────────────────────────────────────────
+    this._enemyHpBarBg = this.add.graphics().setDepth(2);
+    this._enemyHpBarBg.fillStyle(0x330000); this._enemyHpBarBg.fillRoundedRect(10, 52, 240, 10, 3);
+    this._enemyHpBar = this.add.graphics().setDepth(3);
+
     // ── Player info bar ────────────────────────────────────────────────
     this.txtPlayerLife = this.add.text(10, 477, '', { fontSize: '16px', fontFamily: 'monospace', color: '#44ff88', stroke: '#000', strokeThickness: 2 });
+    // Player HP bar
+    this._playerHpBarBg = this.add.graphics().setDepth(2);
+    this._playerHpBarBg.fillStyle(0x003300); this._playerHpBarBg.fillRoundedRect(10, 494, 240, 10, 3);
+    this._playerHpBar = this.add.graphics().setDepth(3);
     this.txtPlayerMana = this.add.text(260, 477, '', { fontSize: '16px', fontFamily: 'monospace', color: '#5599ff', stroke: '#000', strokeThickness: 2 });
     this.txtDeckInfo   = this.add.text(460, 479, '', { fontSize: '12px', fontFamily: 'monospace', color: '#555566' });
     this.txtPlayerGY = this.add.text(660, 477, '⚰ GY: 0', {
@@ -191,6 +201,18 @@ class BattleScene extends Phaser.Scene {
       backgroundColor: '#222222', padding: { x: 8, y: 5 }, color: '#888888'
     }).setOrigin(1).setVisible(false).setInteractive({ useHandCursor: true });
     this.btnCancel.on('pointerdown', () => this.cancelAttack());
+
+    // Concede button (bottom-left)
+    const concede = this.add.text(6, 620, '[Concede]', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#553333'
+    }).setDepth(4).setInteractive({ useHandCursor: true });
+    concede.on('pointerover', () => concede.setStyle({ color: '#884444' }));
+    concede.on('pointerout',  () => concede.setStyle({ color: '#553333' }));
+    concede.on('pointerdown', () => {
+      if (this.gameOver) return;
+      this.gameOver = true;
+      this.showResult('loss');
+    });
 
     // ── Relic indicators (tiny badges right of graveyard) ──────────────
     const ownedRelics = window.GameState?.equippedRelics || [];
@@ -253,6 +275,26 @@ class BattleScene extends Phaser.Scene {
     this.input.on('pointerdown', () => {
       this.dismissActionMenu();
     });
+
+    // ── Keyboard shortcuts ─────────────────────────────────────────────
+    this.input.keyboard.on('keydown-E', () => {
+      if (this.turn === 'player' && !this.gameOver) this.endPlayerTurn();
+    });
+    this.input.keyboard.on('keydown-G', () => {
+      if (!this.gameOver) {
+        if (this._graveyardOpen) this.closeGraveyard();
+        else this.showGraveyard('player');
+      }
+    });
+    this.input.keyboard.on('keydown-ESC', () => {
+      if (this._graveyardOpen) { this.closeGraveyard(); return; }
+      this.dismissActionMenu();
+      this.hideZoom();
+    });
+    // Hint text
+    this.add.text(6, 228, '[E] End Turn  [G] Graveyard', {
+      fontSize: '8px', fontFamily: 'monospace', color: '#333355'
+    }).setDepth(3);
 
     // ── Draw opening hands (+ Scholar Quill bonus), then do dice roll ──
     for (let i = 0; i < 5 + (this._relicExtraDraw || 0); i++) this.drawPlayerCards(1);
@@ -1943,6 +1985,7 @@ class BattleScene extends Phaser.Scene {
 
   showGraveyard(who) {
     this.closeGraveyard();
+    this._graveyardOpen = true;
     const cards = who === 'player' ? this.playerGraveyard : this.enemyGraveyard;
     const title = who === 'player' ? 'YOUR GRAVEYARD' : 'ENEMY GRAVEYARD';
     const W = 420, H = 440, px = 480, py = 305;
@@ -2011,6 +2054,7 @@ class BattleScene extends Phaser.Scene {
   closeGraveyard() {
     this._gyObjs.forEach(o => { try { o.destroy(); } catch(e){} });
     this._gyObjs = [];
+    this._graveyardOpen = false;
   }
 
   addLog(msg, color) {
@@ -2609,6 +2653,20 @@ class BattleScene extends Phaser.Scene {
     this.txtPlayerMana.setText('◆ Mana: ' + this.playerMana);
     this.txtDeckInfo.setText('Deck ' + this.playerDeck.length + '  Hand ' + this.playerHand.length);
     this.txtPlayerGY.setText('⚰ GY: ' + this.playerGraveyard.length);
+
+    // HP bars
+    const BAR_W = 240, BAR_H = 10;
+    this._enemyHpBar.clear();
+    const eRatio = Math.max(0, Math.min(1, this.enemyLife / this.enemyDef.life));
+    const eCol = eRatio > 0.5 ? 0x22bb22 : eRatio > 0.25 ? 0xbb8800 : 0xcc2200;
+    this._enemyHpBar.fillStyle(eCol);
+    this._enemyHpBar.fillRoundedRect(10, 52, Math.floor(BAR_W * eRatio), BAR_H, 3);
+
+    this._playerHpBar.clear();
+    const pRatio = Math.max(0, Math.min(1, this.playerLife / this.playerMaxLife));
+    const pCol = pRatio > 0.5 ? 0x22cc44 : pRatio > 0.25 ? 0xcc8800 : 0xdd2222;
+    this._playerHpBar.fillStyle(pCol);
+    this._playerHpBar.fillRoundedRect(10, 494, Math.floor(BAR_W * pRatio), BAR_H, 3);
   }
 
   // ═══════════════ CARD ART KEY ══════════════════════════════════════════

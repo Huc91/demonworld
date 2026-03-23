@@ -281,6 +281,34 @@ class MenuScene extends Phaser.Scene {
 
       this.drawMiniCard(card, counts[card.id], cx, cy, CW, CH, container);
 
+      // Sell button: only for duplicates (keep at least 1 copy)
+      const sellCount = counts[card.id];
+      if (sellCount > 1) {
+        const sellPrice = { common: 5, uncommon: 10, rare: 20, mythic: 40, legendary: 80 }[card.rarity] || 5;
+        const sbg = this.add.graphics();
+        sbg.fillStyle(0x4a1a00); sbg.fillRect(cx + CW/2 - 30, cy - CH/2, 30, 14);
+        container.add(sbg);
+        const sellBtn = this.add.text(cx + CW/2 - 15, cy - CH/2 + 7, sellPrice + 'G', {
+          fontSize: '7px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffaa44'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        sellBtn.on('pointerover', () => { sbg.clear(); sbg.fillStyle(0x7a3a00); sbg.fillRect(cx + CW/2 - 30, cy - CH/2, 30, 14); });
+        sellBtn.on('pointerout',  () => { sbg.clear(); sbg.fillStyle(0x4a1a00); sbg.fillRect(cx + CW/2 - 30, cy - CH/2, 30, 14); });
+        sellBtn.on('pointerdown', () => {
+          this.hideCardPreview();
+          // Remove one copy from collection and (if in deck) from deck too
+          const ci = window.GameState.playerCollection.indexOf(card.id);
+          if (ci !== -1) window.GameState.playerCollection.splice(ci, 1);
+          const di = window.GameState.playerDeck.indexOf(card.id);
+          if (di !== -1 && counts[card.id] <= 1) window.GameState.playerDeck.splice(di, 1);
+          window.GameState.playerMoney += sellPrice;
+          window.saveGame();
+          this.refreshGold();
+          this.clearContent();
+          this.buildCollection();
+        });
+        container.add(sellBtn);
+      }
+
       const zone = this.add.zone(cx, cy, CW, CH).setInteractive();
       zone.on('pointerover', () => this.showCardPreview(card, cx));
       zone.on('pointerout',  () => this.hideCardPreview());
