@@ -229,7 +229,63 @@ class BattleScene extends Phaser.Scene {
     this.updateUI();
     this.renderAll();
 
-    this.doDiceRoll();
+    // Boss intro overlay
+    const isBossIntro = this.enemyDef.isBoss || this.enemyDef.difficulty === 'boss';
+    if (isBossIntro) {
+      this._showBossIntro(() => this.doDiceRoll());
+    } else {
+      this.doDiceRoll();
+    }
+  }
+
+  _showBossIntro(onDone) {
+    const W = 960, H = 640;
+    const bg = this.add.graphics().setDepth(100);
+    bg.fillStyle(0x000000, 0.95); bg.fillRect(0, 0, W, H);
+    bg.lineStyle(3, 0xff2200, 0.6); bg.strokeRect(8, 8, W-16, H-16);
+
+    // Radiating pixel lines (GBA style — straight lines, no curves)
+    const cx = W/2, cy = H/2;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const col = i % 2 === 0 ? 0x440000 : 0x220000;
+      bg.lineStyle(1, col, 0.6);
+      bg.beginPath();
+      bg.moveTo(cx, cy);
+      bg.lineTo(cx + Math.cos(a) * 600, cy + Math.sin(a) * 600);
+      bg.strokePath();
+    }
+
+    const t1 = this.add.text(W/2, 220, '⚔  BOSS BATTLE  ⚔', {
+      fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#ff4444', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(101).setAlpha(0);
+
+    const t2 = this.add.text(W/2, H/2, this.enemyDef.name.toUpperCase(), {
+      fontSize: '68px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#ffffff', stroke: '#880000', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(101).setAlpha(0);
+
+    const lvlStr = 'Level ' + (this.enemyDef.level || '?') + '  ·  ' + this.enemyDef.life + ' HP';
+    const t3 = this.add.text(W/2, H/2 + 66, lvlStr, {
+      fontSize: '16px', fontFamily: 'monospace',
+      color: '#ff8888', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(101).setAlpha(0);
+
+    const t4 = this.add.text(W/2, H - 100, '"Prepare yourself."', {
+      fontSize: '14px', fontFamily: 'monospace', fontStyle: 'italic',
+      color: '#884444', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(101).setAlpha(0);
+
+    this.tweens.add({ targets: [bg, t1, t2, t3, t4], alpha: 1, duration: 350, ease: 'Power2' });
+
+    // Dismiss after 2.2s
+    this.time.delayedCall(2200, () => {
+      this.tweens.add({
+        targets: [bg, t1, t2, t3, t4], alpha: 0, duration: 400,
+        onComplete: () => { bg.destroy(); t1.destroy(); t2.destroy(); t3.destroy(); t4.destroy(); onDone(); }
+      });
+    });
   }
 
   // ── Compatibility getters ────────────────────────────────────────────
