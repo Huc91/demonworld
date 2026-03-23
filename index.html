@@ -30,15 +30,15 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: #8800cc;
+      color: #cc0022;
       font-family: monospace;
       font-size: 22px;
       z-index: 999;
       gap: 16px;
     }
-    #loading .sub { font-size: 13px; color: #444; }
-    #loading .bar-wrap { width: 260px; height: 6px; background: #1a1a2e; border-radius: 3px; overflow: hidden; }
-    #loading .bar { height: 100%; width: 0%; background: #8800cc; border-radius: 3px; animation: fill 1.2s ease-out forwards; }
+    #loading .sub  { font-size: 13px; color: #444; }
+    #loading .bar-wrap { width: 260px; height: 6px; background: #1a0005; border-radius: 3px; overflow: hidden; }
+    #loading .bar  { height: 100%; width: 0%; background: #cc0022; border-radius: 3px; animation: fill 1.4s ease-out forwards; }
     @keyframes fill { to { width: 100%; } }
   </style>
 </head>
@@ -46,7 +46,7 @@
 
   <div id="loading">
     <div>DEVIL SUMMONER</div>
-    <div class="sub">loading card world...</div>
+    <div class="sub">summoning the darkness...</div>
     <div class="bar-wrap"><div class="bar"></div></div>
   </div>
 
@@ -59,8 +59,10 @@
   <!-- Data -->
   <script src="js/cards.js"></script>
   <script src="js/enemies.js"></script>
+  <script src="js/quests.js"></script>
 
   <!-- Scenes (order matters — all must be defined before Phaser.Game is created) -->
+  <script src="js/scenes/TitleScene.js"></script>
   <script src="js/scenes/PreloadScene.js"></script>
   <script src="js/scenes/HUDScene.js"></script>
   <script src="js/scenes/WorldScene.js"></script>

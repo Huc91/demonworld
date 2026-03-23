@@ -1,3 +1,5 @@
+const TILE = 32;
+
 class WorldScene extends Phaser.Scene {
   constructor() { super({ key: 'WorldScene' }); }
 
@@ -14,6 +16,10 @@ class WorldScene extends Phaser.Scene {
     if (!window.GameState.explored)                 window.GameState.explored    = new Set();
     if (!window.GameState.mapData)                  window.GameState.mapData     = null;
     if (!window.GameState.enemyPositions)           window.GameState.enemyPositions = [];
+    if (!window.GameState.questProgress)            window.GameState.questProgress  = window.initQuestState();
+    if (window.GameState.totalKills  === undefined) window.GameState.totalKills  = 0;
+    if (window.GameState.hardKills   === undefined) window.GameState.hardKills   = 0;
+    if (window.GameState.chestsOpened === undefined) window.GameState.chestsOpened = 0;
 
     // ── Jump state ───────────────────────────────────────────────────────
     this.isJumping      = false;
@@ -39,6 +45,8 @@ class WorldScene extends Phaser.Scene {
     this.buildCampfires();
     this.buildChests();
     this.buildHorses();
+    this.buildNPCs();
+    this.buildAnimals();
 
 
     // Restore echo orb if the player died before recovering gold
@@ -74,11 +82,48 @@ class WorldScene extends Phaser.Scene {
         window.GameState.defeatedEnemy.destroy();
         window.GameState.defeatedEnemy = null;
       }
+
+      // ── Quest progress tracking ───────────────────────────────────────
+      if (reward.enemyDef) {
+        const isBoss = reward.enemyDef.isBoss || reward.enemyDef.difficulty === 'boss';
+        window.GameState.totalKills++;
+        if (reward.enemyDef.difficulty === 'hard' || isBoss) window.GameState.hardKills++;
+        if (isBoss) window.GameState.bossesDefeated.push(reward.enemyDef.id);
+
+        const questEvent = {
+          type: 'kill',
+          difficulty: reward.enemyDef.difficulty,
+          isBoss,
+          bossId: reward.bossId || null,
+        };
+        const changed = window.advanceQuests(questEvent);
+        changed.forEach(qid => {
+          const q = window.QUEST_MAP[qid];
+          if (q && !qid.endsWith('_unlocked')) {
+            this.time.delayedCall(800, () => {
+              this.showMessage('QUEST COMPLETE: ' + q.name + '!', '#ffd700');
+              this.scene.get('HUDScene').updateHUD();
+            });
+          } else if (qid.endsWith('_unlocked')) {
+            const realId = qid.replace('_unlocked', '');
+            const q2 = window.QUEST_MAP[realId];
+            if (q2) {
+              this.time.delayedCall(1600, () => {
+                this.showMessage('NEW QUEST: ' + q2.name, '#44ff88');
+              });
+            }
+          }
+        });
+      }
+
       this.battleCooldown = false;
       this.physics.resume();
       const hud = this.scene.get('HUDScene');
       hud.updateHUD();
       hud.showReward(reward.money, reward.card);
+
+      // Auto-save after every battle win
+      window.saveGame();
     });
 
     this.events.on('battleLost', () => {
@@ -194,6 +239,42 @@ class WorldScene extends Phaser.Scene {
       ctx.ellipse(16, 26, 4, 3, 0, 0, Math.PI * 2);
       ctx.fill();
       ho.refresh();
+    }
+
+    // ── NPC sprite (32×32) ───────────────────────────────────────────────
+    if (!this.textures.exists('npc')) {
+      const npc = this.textures.createCanvas('npc', 32, 32);
+      const ctx = npc.getContext();
+      // Robe body
+      ctx.fillStyle = '#6633aa';
+      ctx.beginPath();
+      ctx.ellipse(16, 22, 9, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Head
+      ctx.fillStyle = '#e8c090';
+      ctx.beginPath();
+      ctx.arc(16, 11, 7, 0, Math.PI * 2);
+      ctx.fill();
+      // Hood/hat
+      ctx.fillStyle = '#440088';
+      ctx.beginPath();
+      ctx.moveTo(9, 11);
+      ctx.lineTo(16, 0);
+      ctx.lineTo(23, 11);
+      ctx.fill();
+      ctx.fillRect(8, 11, 16, 3);
+      // Eyes
+      ctx.fillStyle = '#ffdd88';
+      ctx.fillRect(12, 9, 3, 3);
+      ctx.fillRect(17, 9, 3, 3);
+      // Staff (right side)
+      ctx.fillStyle = '#8b4513';
+      ctx.fillRect(26, 8, 2, 20);
+      ctx.fillStyle = '#aa66ff';
+      ctx.beginPath();
+      ctx.arc(27, 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+      npc.refresh();
     }
 
     // ── Echo Orb (24×24) ─────────────────────────────────────────────────
@@ -459,10 +540,12 @@ class WorldScene extends Phaser.Scene {
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W; c++) {
         const t = map[r][c];
-        const x = c * 32 + 16, y = r * 32 + 16;
+        const x = c * TILE + TILE/2, y = r * TILE + TILE/2;
         const img = this.add.image(x, y, tileKeys[t]).setDepth(0);
         if (blocking[t]) {
           this.physics.add.existing(img, true);
+          img.body.setSize(TILE, TILE);
+          img.body.reset(x, y);
           this.wallGroup.add(img);
         }
         if (t === WATER) {
@@ -473,14 +556,14 @@ class WorldScene extends Phaser.Scene {
 
     this.mapData = map;
     window.GameState.mapData = map;
-    this.physics.world.setBounds(0, 0, W * 32, H * 32);
+    this.physics.world.setBounds(0, 0, W * TILE, H * TILE);
   }
 
   // ─────────────────── PLAYER ─────────────────────────────────────────────
 
   buildPlayer() {
-    const spawnX = 121 * 32 + 16;
-    const spawnY = 76  * 32 + 16;
+    const spawnX = 121 * TILE + TILE/2;
+    const spawnY = 76  * TILE + TILE/2;
     window.GameState.spawnX = spawnX;
     window.GameState.spawnY = spawnY;
 
@@ -494,8 +577,8 @@ class WorldScene extends Phaser.Scene {
       window.GameState.playerY || spawnY,
       playerKey
     ).setDepth(10).setCollideWorldBounds(true);
-    this.player.body.setSize(20, 20);
-    this.player.setScale(1.0);
+    this.player.setScale(1.5);
+    this.player.body.setSize(22, 22);
     if (window.GBA_PLAYER) this.player.play('player_idle');
 
     this.wallCollider = this.physics.add.collider(this.player, this.wallGroup);
@@ -519,59 +602,59 @@ class WorldScene extends Phaser.Scene {
 
     const spawns = [
       // Weak — near start, north wilderness
-      { x:  28*32, y:  28*32, ei: 0 }, { x:  44*32, y:  14*32, ei: 0 },
-      { x:  16*32, y:  14*32, ei: 0 }, { x:  50*32, y:  28*32, ei: 1 },
-      { x:  24*32, y:  40*32, ei: 1 }, { x:  36*32, y:  36*32, ei: 0 },
-      { x:  16*32, y:  56*32, ei: 2 }, { x:  40*32, y:  50*32, ei: 2 },
-      { x:  55*32, y:  44*32, ei: 0 }, { x:  70*32, y:  36*32, ei: 1 },
+      { x:  28*TILE, y:  28*TILE, ei: 0 }, { x:  44*TILE, y:  14*TILE, ei: 0 },
+      { x:  16*TILE, y:  14*TILE, ei: 0 }, { x:  50*TILE, y:  28*TILE, ei: 1 },
+      { x:  24*TILE, y:  40*TILE, ei: 1 }, { x:  36*TILE, y:  36*TILE, ei: 0 },
+      { x:  16*TILE, y:  56*TILE, ei: 2 }, { x:  40*TILE, y:  50*TILE, ei: 2 },
+      { x:  55*TILE, y:  44*TILE, ei: 0 }, { x:  70*TILE, y:  36*TILE, ei: 1 },
 
       // Normal — mid-map
-      { x:  56*32, y:  76*32, ei: 3 }, { x:  52*32, y:  90*32, ei: 3 },
-      { x:  56*32, y: 110*32, ei: 4 }, { x:  54*32, y: 130*32, ei: 4 },
-      { x: 180*32, y: 110*32, ei: 3 }, { x: 190*32, y: 116*32, ei: 4 },
-      { x: 200*32, y: 104*32, ei: 5 }, { x: 172*32, y:  58*32, ei: 4 },
-      { x: 186*32, y:  50*32, ei: 5 }, { x: 140*32, y:  72*32, ei: 3 },
-      { x: 158*32, y:  80*32, ei: 4 }, { x: 148*32, y: 118*32, ei: 5 },
+      { x:  56*TILE, y:  76*TILE, ei: 3 }, { x:  52*TILE, y:  90*TILE, ei: 3 },
+      { x:  56*TILE, y: 110*TILE, ei: 4 }, { x:  54*TILE, y: 130*TILE, ei: 4 },
+      { x: 180*TILE, y: 110*TILE, ei: 3 }, { x: 190*TILE, y: 116*TILE, ei: 4 },
+      { x: 200*TILE, y: 104*TILE, ei: 5 }, { x: 172*TILE, y:  58*TILE, ei: 4 },
+      { x: 186*TILE, y:  50*TILE, ei: 5 }, { x: 140*TILE, y:  72*TILE, ei: 3 },
+      { x: 158*TILE, y:  80*TILE, ei: 4 }, { x: 148*TILE, y: 118*TILE, ei: 5 },
 
       // Hard — dungeon, swamp, far desert, graveyard
-      { x: 200*32, y:  14*32, ei: 6 }, { x: 216*32, y:  28*32, ei: 6 },
-      { x: 224*32, y:  16*32, ei: 7 }, { x: 210*32, y:  36*32, ei: 7 },
-      { x:  22*32, y: 156*32, ei: 6 }, { x:  30*32, y: 164*32, ei: 7 },
-      { x:  40*32, y: 152*32, ei: 8 }, { x:  16*32, y: 170*32, ei: 8 },
-      { x: 230*32, y:  80*32, ei: 7 }, { x: 240*32, y:  90*32, ei: 8 },
-      { x: 260*32, y: 110*32, ei: 6 }, { x: 250*32, y: 130*32, ei: 8 },
-      { x: 165*32, y: 160*32, ei: 8 }, { x: 175*32, y: 170*32, ei: 7 },
-      { x: 168*32, y: 180*32, ei: 6 }, { x: 185*32, y: 160*32, ei: 7 },
+      { x: 200*TILE, y:  14*TILE, ei: 6 }, { x: 216*TILE, y:  28*TILE, ei: 6 },
+      { x: 224*TILE, y:  16*TILE, ei: 7 }, { x: 210*TILE, y:  36*TILE, ei: 7 },
+      { x:  22*TILE, y: 156*TILE, ei: 6 }, { x:  30*TILE, y: 164*TILE, ei: 7 },
+      { x:  40*TILE, y: 152*TILE, ei: 8 }, { x:  16*TILE, y: 170*TILE, ei: 8 },
+      { x: 230*TILE, y:  80*TILE, ei: 7 }, { x: 240*TILE, y:  90*TILE, ei: 8 },
+      { x: 260*TILE, y: 110*TILE, ei: 6 }, { x: 250*TILE, y: 130*TILE, ei: 8 },
+      { x: 165*TILE, y: 160*TILE, ei: 8 }, { x: 175*TILE, y: 170*TILE, ei: 7 },
+      { x: 168*TILE, y: 180*TILE, ei: 6 }, { x: 185*TILE, y: 160*TILE, ei: 7 },
       // Dungeon 2
-      { x:  22*32, y:  10*32, ei: 6 }, { x:  38*32, y:   9*32, ei: 7 },
+      { x:  22*TILE, y:  10*TILE, ei: 6 }, { x:  38*TILE, y:   9*TILE, ei: 7 },
 
       // Bosses
-      { x: 220*32, y:  25*32, ei: 9  },  // Dungeon 1 boss
-      { x:  30*32, y:  11*32, ei: 10 },  // Dungeon 2 boss
-      { x: 290*32, y: 120*32, ei: 11 },  // Deep desert arena boss
-      { x: 170*32, y: 174*32, ei:  9 },  // Graveyard king
-      { x:  24*32, y: 168*32, ei: 10 },  // Swamp lord
+      { x: 220*TILE, y:  25*TILE, ei: 9,  spawnId: 'boss_dungeon1'  },
+      { x:  30*TILE, y:  11*TILE, ei: 10, spawnId: 'boss_dungeon2'  },
+      { x: 290*TILE, y: 120*TILE, ei: 11, spawnId: 'boss_desert'    },
+      { x: 170*TILE, y: 174*TILE, ei:  9, spawnId: 'boss_graveyard' },
+      { x:  24*TILE, y: 168*TILE, ei: 10, spawnId: 'boss_swamp'     },
     ];
 
     spawns.forEach(sp => {
-      if (sp.x >= this.mapWidth * 32 || sp.y >= this.mapHeight * 32) return;
+      if (sp.x >= this.mapWidth * TILE || sp.y >= this.mapHeight * TILE) return;
       const enemyDef = E[sp.ei];
       if (!enemyDef) return;
       const sprite = this.physics.add.sprite(sp.x, sp.y, enemyDef.sprite)
         .setDepth(9).setCollideWorldBounds(true);
       sprite.enemyData    = enemyDef;
+      sprite.spawnId      = sp.spawnId || null;
       sprite.wanderTimer  = Phaser.Math.Between(500, 2500);
+      sprite.setScale(1.2);
       sprite.body.setSize(22, 22);
 
       const diff = enemyDef.difficulty;
       if (diff === 'boss') {
-        sprite.setScale(1.9);
         this.tweens.add({
           targets: sprite, tint: { from: 0x220033, to: 0xaa00ff },
           duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
       } else {
-        sprite.setScale(1.3);
         if (TINT[diff]) sprite.setTint(TINT[diff]);
       }
       if (enemyDef.sprite && enemyDef.sprite.startsWith('char_')) {
@@ -590,9 +673,12 @@ class WorldScene extends Phaser.Scene {
       window.GameState.playerX = player.x;
       window.GameState.playerY = player.y;
       window.GameState.defeatedEnemy = enemy;
+      window.GameState.currentEnemySpawnId = enemy.spawnId || null;
 
       this.physics.pause();
       this.cameras.main.flash(250, 200, 0, 0);
+      // Screen shake on battle start
+      this.cameras.main.shake(300, 0.008);
       this.time.delayedCall(300, () => {
         this.scene.launch('BattleScene', { enemy: enemy.enemyData });
         this.scene.pause();
@@ -603,7 +689,7 @@ class WorldScene extends Phaser.Scene {
   // ─────────────────── CAMERA ─────────────────────────────────────────────
 
   buildCamera() {
-    this.cameras.main.setBounds(0, 0, this.mapWidth * 32, this.mapHeight * 32);
+    this.cameras.main.setBounds(0, 0, this.mapWidth * TILE, this.mapHeight * TILE);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(1.2);
     this.cameras.main.setBackgroundColor('#0a0a12');
@@ -740,6 +826,71 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
+  // ─────────────────── NPCS ───────────────────────────────────────────────
+
+  buildNPCs() {
+    this.npcs = [];
+    if (!window.QUESTS) return;
+
+    // Deduplicate NPCs by pixel position (some quests share an NPC)
+    const placed = new Map();
+
+    window.QUESTS.forEach(quest => {
+      const key = quest.npcTileX + ',' + quest.npcTileY;
+      if (placed.has(key)) {
+        // Add this quest to the existing NPC
+        placed.get(key).questIds.push(quest.id);
+        return;
+      }
+      const px = quest.npcTileX * TILE + TILE/2;
+      const py = quest.npcTileY * TILE + TILE/2;
+
+      const sprite = this.add.sprite(px, py, 'npc').setDepth(10).setScale(1.1);
+
+      // Gentle bob animation
+      this.tweens.add({
+        targets: sprite, y: py - 4,
+        duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+
+      // Name label
+      const label = this.add.text(px, py - 26, quest.npc, {
+        fontSize: '9px', fontFamily: 'monospace',
+        color: '#cc99ff', stroke: '#000', strokeThickness: 2,
+        backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+      }).setDepth(11).setOrigin(0.5);
+
+      // Exclamation mark for active quests
+      const marker = this.add.text(px + 12, py - 22, '!', {
+        fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: '#ffdd00', stroke: '#000', strokeThickness: 3,
+      }).setDepth(12).setOrigin(0.5).setVisible(false);
+      this.tweens.add({
+        targets: marker, y: py - 28, alpha: 0.6,
+        duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+
+      const npcObj = { sprite, label, marker, questIds: [quest.id], px, py };
+      this.npcs.push(npcObj);
+      placed.set(key, npcObj);
+    });
+
+    // Periodic marker refresh
+    this.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => {
+        this.npcs.forEach(n => {
+          const hasActive = n.questIds.some(qid => {
+            const s = window.GameState.questProgress?.[qid];
+            return s && (s.status === 'active' || s.status === 'complete');
+          });
+          n.marker.setVisible(hasActive);
+        });
+      },
+    });
+  }
+
   // ─────────────────── ANIMALS ────────────────────────────────────────────
 
   buildAnimals() {
@@ -757,15 +908,15 @@ class WorldScene extends Phaser.Scene {
       const tileType = this.mapData?.[r]?.[c];
       if (tileType !== 0 && tileType !== 7) continue;
       const key = window.ANIMAL_KEYS[Math.floor(Math.random() * window.ANIMAL_KEYS.length)];
-      const a   = this.add.sprite(c * 32 + 16, r * 32 + 16, key).setDepth(8).setScale(0.5);
+      const a   = this.add.sprite(c * TILE + TILE/2, r * TILE + TILE/2, key).setDepth(8).setScale(0.5);
       if (this.anims.exists(key + '_idle')) a.play(key + '_idle');
       this.time.addEvent({
         delay: Phaser.Math.Between(3000, 9000),
         loop: true,
         callback: () => {
           if (!a.scene) return;
-          const tx = Phaser.Math.Clamp(a.x + Phaser.Math.Between(-64, 64), 0, this.mapWidth  * 32);
-          const ty = Phaser.Math.Clamp(a.y + Phaser.Math.Between(-64, 64), 0, this.mapHeight * 32);
+          const tx = Phaser.Math.Clamp(a.x + Phaser.Math.Between(-64, 64), 0, this.mapWidth  * TILE);
+          const ty = Phaser.Math.Clamp(a.y + Phaser.Math.Between(-64, 64), 0, this.mapHeight * TILE);
           this.tweens.add({ targets: a, x: tx, y: ty, duration: 900, ease: 'Sine.easeInOut' });
         },
       });
@@ -859,6 +1010,10 @@ class WorldScene extends Phaser.Scene {
     const px = this.player.x, py = this.player.y;
     const dist = (a, b) => Math.sqrt((a.x - px) ** 2 + (a.y - py) ** 2);
 
+    // Priority 0: NPC dialogue
+    const nearNPC = (this.npcs || []).find(n => Math.sqrt((n.px - px)**2 + (n.py - py)**2) < 50);
+    if (nearNPC) { this._talkToNPC(nearNPC); return; }
+
     // Priority 1: Horse (mount / dismount)
     if (this.mountedHorse) {
       this._dismountHorse();
@@ -880,6 +1035,67 @@ class WorldScene extends Phaser.Scene {
     // Priority 4: Campfire
     const nearFire = this.campfires.find(cf => dist(cf) < 44);
     if (nearFire) { this._restAtCampfire(nearFire); return; }
+  }
+
+  // ── NPC dialogue ──────────────────────────────────────────────────────────
+
+  _talkToNPC(npcObj) {
+    if (this._dialogueActive) return;
+    this._dialogueActive = true;
+
+    // Find the most relevant quest for this NPC
+    let activeQuest = null;
+    let dialogueKey = 'locked';
+
+    for (const qid of npcObj.questIds) {
+      const quest = window.QUEST_MAP[qid];
+      const state = window.GameState.questProgress?.[qid];
+      if (!state || !quest) continue;
+      if (state.status === 'complete') { activeQuest = quest; dialogueKey = 'complete'; break; }
+      if (state.status === 'active')   { activeQuest = quest; dialogueKey = 'active';   break; }
+      if (state.status === 'claimed')  { activeQuest = quest; dialogueKey = 'claimed';  }
+    }
+    if (!activeQuest) {
+      // Fall back to first quest
+      activeQuest = window.QUEST_MAP[npcObj.questIds[0]];
+    }
+
+    const text = activeQuest?.dialogue?.[dialogueKey] ?? 'Greetings, traveller.';
+    const npcName = npcObj.questIds[0] ? (window.QUEST_MAP[npcObj.questIds[0]]?.npc ?? 'NPC') : 'NPC';
+
+    // Show dialogue box
+    const cx = this.cameras.main.scrollX + 480;
+    const cy = this.cameras.main.scrollY + 500;
+    const W = 700, H = 90;
+
+    const bg   = this.add.graphics().setDepth(300);
+    bg.fillStyle(0x0a0018, 0.94); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    bg.lineStyle(2, 0x8844cc);    bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+
+    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 8, npcName, {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#cc88ff',
+      stroke: '#000', strokeThickness: 2,
+    }).setDepth(301);
+
+    const bodyT = this.add.text(cx - W/2 + 14, cy - H/2 + 28, text, {
+      fontSize: '12px', fontFamily: 'monospace', color: '#ddddee',
+      wordWrap: { width: W - 28 },
+    }).setDepth(301);
+
+    const hint = this.add.text(cx + W/2 - 10, cy + H/2 - 8, '[F] close', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#555566',
+    }).setDepth(301).setOrigin(1, 1);
+
+    const close = () => {
+      [bg, nameT, bodyT, hint].forEach(o => o.destroy());
+      this._dialogueActive = false;
+    };
+
+    // Close on F key or after timeout
+    const closeKey = this.input.keyboard.once('keydown-F', close);
+    this.time.delayedCall(6000, () => {
+      if (this._dialogueActive) close();
+    });
   }
 
   // ── Campfire ─────────────────────────────────────────────────────────────
@@ -916,8 +1132,23 @@ class WorldScene extends Phaser.Scene {
       msg = 'TREASURE!  Found: ' + cardName + '!';
     }
 
+    // ── Quest progress tracking for chest opens ───────────────────────
+    window.GameState.chestsOpened = (window.GameState.chestsOpened || 0) + 1;
+    const questEvent = { type: 'chest' };
+    const changed = window.advanceQuests(questEvent);
+    changed.forEach(qid => {
+      const q = window.QUEST_MAP[qid];
+      if (q && !qid.endsWith('_unlocked')) {
+        this.time.delayedCall(600, () => {
+          this.showMessage('QUEST COMPLETE: ' + q.name + '!', '#ffd700');
+          this.scene.get('HUDScene').updateHUD();
+        });
+      }
+    });
+
     this.scene.get('HUDScene').updateHUD();
     this._showTreasureOverlay(msg);
+    window.saveGame();
   }
 
   _showTreasureOverlay(msg) {
@@ -1023,7 +1254,7 @@ class WorldScene extends Phaser.Scene {
     }
 
     // ── F key (interact) ─────────────────────────────────────────────────
-    if (Phaser.Input.Keyboard.JustDown(fKey)) {
+    if (Phaser.Input.Keyboard.JustDown(fKey) && !this._dialogueActive) {
       this._handleInteract();
     }
 
@@ -1061,17 +1292,17 @@ class WorldScene extends Phaser.Scene {
       horse.wanderTimer -= delta;
       if (horse.wanderTimer <= 0) {
         const tx = Phaser.Math.Clamp(
-          horse.baseX + Phaser.Math.Between(-96, 96), 0, this.mapWidth * 32);
+          horse.baseX + Phaser.Math.Between(-96, 96), 0, this.mapWidth * TILE);
         const ty = Phaser.Math.Clamp(
-          horse.baseY + Phaser.Math.Between(-96, 96), 0, this.mapHeight * 32);
+          horse.baseY + Phaser.Math.Between(-96, 96), 0, this.mapHeight * TILE);
         this.tweens.add({ targets: horse, x: tx, y: ty, duration: 1800, ease: 'Sine.easeInOut' });
         horse.wanderTimer = Phaser.Math.Between(4000, 9000);
       }
     });
 
     // ── Explored tiles update ─────────────────────────────────────────────
-    const pr = Math.floor(this.player.y / 32);
-    const pc = Math.floor(this.player.x / 32);
+    const pr = Math.floor(this.player.y / TILE);
+    const pc = Math.floor(this.player.x / TILE);
     const radius = 5;
     for (let dr = -radius; dr <= radius; dr++) {
       for (let dc = -radius; dc <= radius; dc++) {

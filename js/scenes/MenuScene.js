@@ -9,6 +9,8 @@ class MenuScene extends Phaser.Scene {
   create() {
     this.activeTab = 'collection'; // 'collection' | 'deck' | 'shop'
     this._contentObjs = [];
+    this._collScrollY = 0;
+    this._deckScrollY = 0;
 
     // ── Backdrop ──────────────────────────────────────────────────────
     const ov = this.add.graphics();
@@ -31,8 +33,8 @@ class MenuScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-M',   () => this.closeMenu());
 
     // ── Tabs ──────────────────────────────────────────────────────────
-    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP'];
-    const tabW = 200, tabY = 68;
+    const tabs = ['COLLECTION', 'DECK BUILDER', 'SHOP', 'QUESTS'];
+    const tabW = 175, tabY = 68;
     const tabStartX = 480 - (tabs.length * tabW + (tabs.length-1)*8) / 2;
 
     this.tabBtns = tabs.map((label, i) => {
@@ -41,7 +43,8 @@ class MenuScene extends Phaser.Scene {
         fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
         backgroundColor: '#111133', padding: { x: 12, y: 8 }, color: '#888899'
       }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      const key = label === 'COLLECTION' ? 'collection' : label === 'DECK BUILDER' ? 'deck' : 'shop';
+      const keyMap = { 'COLLECTION': 'collection', 'DECK BUILDER': 'deck', 'SHOP': 'shop', 'QUESTS': 'quests' };
+      const key = keyMap[label] || label.toLowerCase();
       btn.on('pointerdown', () => this.switchTab(key));
       btn.on('pointerover', () => { if (this.activeTab !== key) btn.setStyle({ color: '#ccccff' }); });
       btn.on('pointerout',  () => { if (this.activeTab !== key) btn.setStyle({ color: '#888899' }); });
@@ -73,11 +76,16 @@ class MenuScene extends Phaser.Scene {
     this.clearContent();
     if (key === 'collection') this.buildCollection();
     else if (key === 'deck')  this.buildDeckBuilder();
-    else                      this.buildShop();
+    else if (key === 'shop')  this.buildShop();
+    else if (key === 'quests') this.buildQuests();
   }
 
   clearContent() {
     this.hideCardPreview();
+    if (this._scrollHandler) {
+      this.input.off('wheel', this._scrollHandler);
+      this._scrollHandler = null;
+    }
     this._contentObjs.forEach(o => { try { o.destroy(); } catch(e){} });
     this._contentObjs = [];
   }
@@ -108,8 +116,8 @@ class MenuScene extends Phaser.Scene {
     this._previewObjs = [];
     const W = 190, H = 270;
     const DEPTH = 60;
-    const rarityBorder = { common: 0x444444, uncommon: 0xcccccc, rare: 0x2266cc, mythic: 0x9933cc, legendary: 0xcc8800 };
-    const rarityColor  = { common: '#888888', uncommon: '#4488ff', rare: '#ff8844', mythic: '#dd44ff', legendary: '#ffaa00' };
+    const rarityBorder = { common: 0x444444, uncommon: 0xcccccc, rare: 0x2266cc, mythic: 0x9933cc, legendary: 0xff6600 };
+    const rarityColor  = { common: '#888888', uncommon: '#cccccc', rare: '#2266cc', mythic: '#9933cc', legendary: '#ff6600' };
 
     // Position: right side if hovered card is in left half, left side otherwise
     const px = fromX < 480 ? Math.min(960 - W/2 - 15, 855) : Math.max(W/2 + 15, 105);
@@ -164,14 +172,16 @@ class MenuScene extends Phaser.Scene {
       );
     }
 
-    // Flavour desc
-    const descY = py + (card.type === 'demon' ? (card.abilityDesc ? 78 : 54) : (card.abilityDesc ? 54 : 34));
-    this._previewObjs.push(
-      this.add.text(px, descY, card.desc || '', {
-        fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
-        wordWrap: { width: W - 24 }, align: 'center'
-      }).setOrigin(0.5, 0).setDepth(DEPTH + .1)
-    );
+    // Flavour desc — demons only (spells already show desc as the effect line above)
+    if (card.type === 'demon' && card.desc) {
+      const descY = py + (card.abilityDesc ? 78 : 54);
+      this._previewObjs.push(
+        this.add.text(px, descY, card.desc, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
+          wordWrap: { width: W - 24 }, align: 'center'
+        }).setOrigin(0.5, 0).setDepth(DEPTH + .1)
+      );
+    }
 
     // Rarity + subtype label
     const subtypeStr = card.subtype ? '  [' + card.subtype.toUpperCase() + ']' : '';
@@ -212,89 +222,107 @@ class MenuScene extends Phaser.Scene {
   // ════════════════════════════════════════════════════════════════════
 
   buildCollection() {
-    const coll = window.GameState.playerCollection;
+    const SCROLL_TOP = 140, SCROLL_BOT = 618, VISIBLE_H = SCROLL_BOT - SCROLL_TOP;
 
+    const coll = window.GameState.playerCollection;
     this._contentObjs.push(this.add.text(480, 115, 'All cards you own  (' + coll.length + ' total)', {
       fontSize: '13px', fontFamily: 'monospace', color: '#8888bb'
     }).setOrigin(0.5, 0));
 
-    // Count duplicates
     const counts = {};
     coll.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
     const unique = Object.keys(counts).map(id => window.CARD_MAP[id]).filter(Boolean);
+    unique.sort((a, b) => { if (a.type !== b.type) return a.type === 'demon' ? -1 : 1; return a.cost - b.cost; });
 
-    // Sort: demons first, then by cost
-    unique.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'demon' ? -1 : 1;
-      return a.cost - b.cost;
-    });
-
-    // Grid: 8 per row
     const CW = 100, CH = 90, GAP = 6, COLS = 8;
-    const gridX = 40, gridY = 145;
+    const gridX = 40;
+    const totalH = Math.ceil(unique.length / COLS) * (CH + GAP);
+    const maxScroll = Math.max(0, totalH - VISIBLE_H + CH);
+    this._collScrollY = Phaser.Math.Clamp(this._collScrollY, -maxScroll, 0);
+
+    // Clip mask (fixed in world space)
+    const maskGfx = this.add.graphics();
+    maskGfx.fillStyle(0xffffff).fillRect(20, SCROLL_TOP, 920, VISIBLE_H);
+    const mask = maskGfx.createGeometryMask();
+    maskGfx.setVisible(false);
+    this._contentObjs.push(maskGfx);
+
+    // Scrollable container — y offset drives scroll
+    const container = this.add.container(0, SCROLL_TOP + this._collScrollY);
+    container.setMask(mask);
+    this._contentObjs.push(container);
+
+    if (unique.length === 0) {
+      const t = this.add.text(480, 200, 'No cards yet — win battles to collect!', {
+        fontSize: '16px', fontFamily: 'monospace', color: '#554455'
+      }).setOrigin(0.5);
+      container.add(t);
+    }
 
     unique.forEach((card, i) => {
       const col = i % COLS, row = Math.floor(i / COLS);
       const cx = gridX + col*(CW+GAP) + CW/2;
-      const cy = gridY + row*(CH+GAP) + CH/2;
-      if (cy + CH/2 > 600) return; // clip
+      const cy = row*(CH+GAP) + CH/2; // relative to container
 
-      this.drawMiniCard(card, counts[card.id], cx, cy, CW, CH);
+      this.drawMiniCard(card, counts[card.id], cx, cy, CW, CH, container);
 
-      // Hover zone for full card preview
       const zone = this.add.zone(cx, cy, CW, CH).setInteractive();
       zone.on('pointerover', () => this.showCardPreview(card, cx));
       zone.on('pointerout',  () => this.hideCardPreview());
-      this._contentObjs.push(zone);
+      container.add(zone);
     });
 
-    if (unique.length === 0) {
-      this._contentObjs.push(this.add.text(480, 350, 'No cards yet — win battles to collect!', {
-        fontSize: '16px', fontFamily: 'monospace', color: '#554455'
-      }).setOrigin(0.5));
-    }
+    // Scrollbar track + thumb
+    this._drawScrollbar(920, SCROLL_TOP, VISIBLE_H, totalH, -this._collScrollY, container);
+
+    // Wheel handler
+    this._scrollHandler = (_p, _g, _x, deltaY) => {
+      this._collScrollY = Phaser.Math.Clamp(this._collScrollY - deltaY * 0.4, -maxScroll, 0);
+      container.y = SCROLL_TOP + this._collScrollY;
+      this._updateScrollbar(container, -this._collScrollY, totalH, VISIBLE_H);
+    };
+    this.input.on('wheel', this._scrollHandler);
   }
 
-  drawMiniCard(card, count, cx, cy, W, H) {
-    const rarityBorder = { common: 0x444444, uncommon: 0xcccccc, rare: 0x2266cc, mythic: 0x9933cc, legendary: 0xcc8800 };
-    const border = rarityBorder[card.rarity] || 0x445544;
+  drawMiniCard(card, count, cx, cy, W, H, container = null) {
+    const rarityBorder = { common: 0x444444, uncommon: 0xcccccc, rare: 0x2266cc, mythic: 0x9933cc, legendary: 0xff6600 };
+    const border = rarityBorder[card.rarity] || 0x444444;
+    const add = (obj) => { container ? container.add(obj) : this._contentObjs.push(obj); return obj; };
 
     // Frame
     const g = this.add.graphics();
     g.fillStyle(0x151525); g.fillRoundedRect(cx-W/2, cy-H/2, W, H, 4);
     g.lineStyle(2, border); g.strokeRoundedRect(cx-W/2, cy-H/2, W, H, 4);
-    this._contentObjs.push(g);
+    add(g);
 
-    // Art (square, centred)
+    // Art
     const artSize = Math.min(W - 10, Math.floor(H * 0.5));
-    const artImg = this.add.image(cx, cy - 4, this.artKey(card)).setDisplaySize(artSize, artSize);
-    this._contentObjs.push(artImg);
+    add(this.add.image(cx, cy - 4, this.artKey(card)).setDisplaySize(artSize, artSize));
 
-    // Name — top centre
-    this._contentObjs.push(this.add.text(cx, cy - H/2 + 3, card.name, {
+    // Name
+    add(this.add.text(cx, cy - H/2 + 3, card.name, {
       fontSize: '7px', fontFamily: 'monospace', color: '#dddddd',
       wordWrap: { width: W - 6 }, align: 'center'
     }).setOrigin(0.5, 0));
 
-    // Cost badge — top-left circle
+    // Cost badge
     const cg = this.add.graphics();
     cg.fillStyle(0x000088); cg.fillCircle(cx - W/2 + 9, cy - H/2 + 9, 8);
-    this._contentObjs.push(cg,
-      this.add.text(cx - W/2 + 9, cy - H/2 + 9, '' + (card.cost || 0), {
-        fontSize: '8px', fontFamily: 'monospace', fontStyle: 'bold', color: '#88ccff'
-      }).setOrigin(0.5)
-    );
+    add(cg);
+    add(this.add.text(cx - W/2 + 9, cy - H/2 + 9, '' + (card.cost || 0), {
+      fontSize: '8px', fontFamily: 'monospace', fontStyle: 'bold', color: '#88ccff'
+    }).setOrigin(0.5));
 
-    // Stats — bottom (ATK/HP for demon, "SPELL" for spells)
+    // Stats
     const statLine = card.type === 'demon' ? '⚔' + card.atk + ' ❤' + card.hp : 'SPELL';
-    this._contentObjs.push(this.add.text(cx, cy + H/2 - 10, statLine, {
+    add(this.add.text(cx, cy + H/2 - 10, statLine, {
       fontSize: '8px', fontFamily: 'monospace',
       color: card.type === 'demon' ? '#ffcc44' : '#aaaaff', align: 'center'
     }).setOrigin(0.5, 1));
 
-    // Quantity badge — top-right
+    // Quantity badge
     if (count > 1) {
-      this._contentObjs.push(this.add.text(cx + W/2 - 3, cy - H/2 + 3, 'x' + count, {
+      add(this.add.text(cx + W/2 - 3, cy - H/2 + 3, 'x' + count, {
         fontSize: '7px', fontFamily: 'monospace', color: '#aaaaaa'
       }).setOrigin(1, 0));
     }
@@ -354,7 +382,8 @@ class MenuScene extends Phaser.Scene {
     dv.lineStyle(1, 0x333355); dv.lineBetween(580, 105, 580, 610);
     this._contentObjs.push(dv);
 
-    // ── Collection side (left) ──
+    // ── Collection side (left, scrollable) ──
+    const SCROLL_TOP = 140, SCROLL_BOT = 618, VISIBLE_H = SCROLL_BOT - SCROLL_TOP;
     this._contentObjs.push(this.add.text(40, 112, 'COLLECTION  (click to add to deck)', {
       fontSize: '12px', fontFamily: 'monospace', color: '#8888bb'
     }));
@@ -363,13 +392,25 @@ class MenuScene extends Phaser.Scene {
     unique.sort((a,b) => { if (a.type !== b.type) return a.type==='demon'?-1:1; return a.cost - b.cost; });
 
     const CW = 90, CH = 80, GAP = 5, COLS = 5;
-    const gridX = 40, gridY = 142;
+    const gridX = 40;
+    const totalH = Math.ceil(unique.length / COLS) * (CH + GAP);
+    const maxScroll = Math.max(0, totalH - VISIBLE_H + CH);
+    this._deckScrollY = Phaser.Math.Clamp(this._deckScrollY, -maxScroll, 0);
+
+    const maskGfx = this.add.graphics();
+    maskGfx.fillStyle(0xffffff).fillRect(20, SCROLL_TOP, 558, VISIBLE_H);
+    const mask = maskGfx.createGeometryMask();
+    maskGfx.setVisible(false);
+    this._contentObjs.push(maskGfx);
+
+    const container = this.add.container(0, SCROLL_TOP + this._deckScrollY);
+    container.setMask(mask);
+    this._contentObjs.push(container);
 
     unique.forEach((card, i) => {
       const col = i % COLS, row = Math.floor(i / COLS);
       const cx = gridX + col*(CW+GAP) + CW/2;
-      const cy = gridY + row*(CH+GAP) + CH/2;
-      if (cy + CH/2 > 610) return;
+      const cy = row*(CH+GAP) + CH/2; // relative to container
 
       const inDeck = deckCounts[card.id] || 0;
       const owned  = collCounts[card.id] || 0;
@@ -380,66 +421,56 @@ class MenuScene extends Phaser.Scene {
       g.fillRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
       g.lineStyle(2, canAdd ? 0x445544 : 0x222233);
       g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
-      this._contentObjs.push(g);
+      container.add(g);
 
-      // Art
       const artSize2 = Math.min(CW - 10, Math.floor(CH * 0.5));
-      const artImg = this.add.image(cx, cy - 4, this.artKey(card))
-        .setDisplaySize(artSize2, artSize2)
-        .setAlpha(canAdd ? 1 : 0.35);
-      this._contentObjs.push(artImg);
+      container.add(this.add.image(cx, cy - 4, this.artKey(card))
+        .setDisplaySize(artSize2, artSize2).setAlpha(canAdd ? 1 : 0.35));
 
-      // Name
-      this._contentObjs.push(this.add.text(cx, cy - CH/2 + 3, card.name, {
+      container.add(this.add.text(cx, cy - CH/2 + 3, card.name, {
         fontSize: '7px', fontFamily: 'monospace', color: canAdd ? '#dddddd' : '#555555',
         wordWrap: { width: CW - 6 }, align: 'center'
       }).setOrigin(0.5, 0));
 
-      // Cost badge
       const cg2 = this.add.graphics();
       cg2.fillStyle(canAdd ? 0x000088 : 0x111122); cg2.fillCircle(cx - CW/2 + 9, cy - CH/2 + 9, 8);
-      this._contentObjs.push(cg2,
-        this.add.text(cx - CW/2 + 9, cy - CH/2 + 9, '' + (card.cost || 0), {
-          fontSize: '8px', fontFamily: 'monospace', fontStyle: 'bold',
-          color: canAdd ? '#88ccff' : '#334455'
-        }).setOrigin(0.5)
-      );
+      container.add(cg2);
+      container.add(this.add.text(cx - CW/2 + 9, cy - CH/2 + 9, '' + (card.cost || 0), {
+        fontSize: '8px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: canAdd ? '#88ccff' : '#334455'
+      }).setOrigin(0.5));
 
-      // Stats
       const statLine2 = card.type === 'demon' ? '⚔' + card.atk + ' ❤' + card.hp : 'SPELL';
-      this._contentObjs.push(this.add.text(cx, cy + CH/2 - 16, statLine2, {
+      container.add(this.add.text(cx, cy + CH/2 - 16, statLine2, {
         fontSize: '8px', fontFamily: 'monospace',
         color: canAdd ? (card.type === 'demon' ? '#ffcc44' : '#aaaaff') : '#444422', align: 'center'
       }).setOrigin(0.5, 1));
 
-      // in deck count
-      this._contentObjs.push(this.add.text(cx, cy + CH/2 - 4, inDeck + '/' + owned, {
+      container.add(this.add.text(cx, cy + CH/2 - 4, inDeck + '/' + owned, {
         fontSize: '7px', fontFamily: 'monospace', color: canAdd ? '#44aa44' : '#555555'
       }).setOrigin(0.5, 1));
 
-      // All cards get hover preview; canAdd cards also get click-to-add
       const zone = this.add.zone(cx, cy, CW, CH).setInteractive({ useHandCursor: canAdd });
-      if (canAdd) {
-        zone.on('pointerdown', () => this.addToDeck(card.id));
-      }
+      if (canAdd) zone.on('pointerdown', () => this.addToDeck(card.id));
       zone.on('pointerover', () => {
         this.showCardPreview(card, cx);
-        if (canAdd) {
-          g.clear();
-          g.fillStyle(0x223322); g.fillRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
-          g.lineStyle(2, 0x88ff88); g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
-        }
+        if (canAdd) { g.clear(); g.fillStyle(0x223322); g.fillRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4); g.lineStyle(2, 0x88ff88); g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4); }
       });
       zone.on('pointerout', () => {
         this.hideCardPreview();
-        if (canAdd) {
-          g.clear();
-          g.fillStyle(0x151525); g.fillRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
-          g.lineStyle(2, 0x445544); g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4);
-        }
+        if (canAdd) { g.clear(); g.fillStyle(0x151525); g.fillRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4); g.lineStyle(2, 0x445544); g.strokeRoundedRect(cx-CW/2, cy-CH/2, CW, CH, 4); }
       });
-      this._contentObjs.push(zone);
+      container.add(zone);
     });
+
+    this._drawScrollbar(570, SCROLL_TOP, VISIBLE_H, totalH, -this._deckScrollY, container);
+
+    this._scrollHandler = (_p, _g, _x, deltaY) => {
+      this._deckScrollY = Phaser.Math.Clamp(this._deckScrollY - deltaY * 0.4, -maxScroll, 0);
+      container.y = SCROLL_TOP + this._deckScrollY;
+      this._updateScrollbar(container, -this._deckScrollY, totalH, VISIBLE_H);
+    };
+    this.input.on('wheel', this._scrollHandler);
   }
 
   addToDeck(cardId) {
@@ -588,17 +619,17 @@ class MenuScene extends Phaser.Scene {
     let cardObjs = [];
 
     const rarityBorderColor = {
-      common:    0x556655,
-      uncommon:  0x224488,
-      rare:      0xaa4422,
-      mythic:    0x882288,
+      common:    0x444444,
+      uncommon:  0xcccccc,
+      rare:      0x2266cc,
+      mythic:    0x9933cc,
       legendary: 0xff6600,
     };
     const rarityTextColor = {
       common:    '#888888',
-      uncommon:  '#4488ff',
-      rare:      '#ff8844',
-      mythic:    '#dd44ff',
+      uncommon:  '#cccccc',
+      rare:      '#2266cc',
+      mythic:    '#9933cc',
       legendary: '#ff6600',
     };
 
@@ -679,9 +710,9 @@ class MenuScene extends Phaser.Scene {
         : null;
       if (abilityText) cardObjs.push(abilityText);
 
-      // Flavour desc
-      const descY = cy + (card.type === 'demon' ? (card.abilityDesc ? 92 : 64) : (card.abilityDesc ? 72 : 52));
-      const descText = card.desc
+      // Flavour desc — demons only (spells already show desc as the effect line above)
+      const descY = cy + (card.abilityDesc ? 92 : 64);
+      const descText = (card.type === 'demon' && card.desc)
         ? this.add.text(cx, descY, card.desc, {
             fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
             stroke: '#000', strokeThickness: 1,
@@ -750,6 +781,44 @@ class MenuScene extends Phaser.Scene {
     showCard(0);
   }
 
+  // ── Scrollbar helpers ────────────────────────────────────────────────
+  // Draws a fixed-position scrollbar track + thumb. Returns { track, thumb }.
+  // The graphics objects are stored on `this` so _updateScrollbar can find them.
+  _drawScrollbar(x, top, visibleH, totalH, scrollY, _container) {
+    const TRACK_W = 6;
+    const thumbH  = Math.max(20, Math.round(visibleH * (visibleH / Math.max(totalH, visibleH + 1))));
+    const trackH  = visibleH;
+    const maxScroll = Math.max(0, totalH - visibleH);
+    const thumbY  = maxScroll > 0 ? Math.round((scrollY / maxScroll) * (trackH - thumbH)) : 0;
+
+    // Track
+    const track = this.add.graphics();
+    track.fillStyle(0x222244, 0.8);
+    track.fillRoundedRect(x, top, TRACK_W, trackH, 3);
+    this._contentObjs.push(track);
+
+    // Thumb
+    const thumb = this.add.graphics();
+    thumb.fillStyle(0x6655cc, 1);
+    thumb.fillRoundedRect(x, top + thumbY, TRACK_W, thumbH, 3);
+    this._contentObjs.push(thumb);
+
+    // Store refs for update
+    this._scrollbarTrack = track;
+    this._scrollbarThumb = thumb;
+    this._scrollbarMeta  = { x, top, trackH, thumbH, totalH, visibleH };
+  }
+
+  _updateScrollbar(_container, scrollY, _totalH, _visibleH) {
+    if (!this._scrollbarThumb || !this._scrollbarMeta) return;
+    const { x, top, trackH, thumbH, totalH: tH, visibleH: vH } = this._scrollbarMeta;
+    const maxScroll = Math.max(0, tH - vH);
+    const thumbY = maxScroll > 0 ? Math.round((scrollY / maxScroll) * (trackH - thumbH)) : 0;
+    this._scrollbarThumb.clear();
+    this._scrollbarThumb.fillStyle(0x6655cc, 1);
+    this._scrollbarThumb.fillRoundedRect(x, top + thumbY, 6, thumbH, 3);
+  }
+
   flashMsg(msg, color) {
     const t = this.add.text(480, 320, msg, {
       fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
@@ -757,5 +826,129 @@ class MenuScene extends Phaser.Scene {
       backgroundColor: '#00000099', padding: { x: 14, y: 8 }
     }).setOrigin(0.5).setDepth(20);
     this.tweens.add({ targets: t, y: 250, alpha: 0, duration: 2000, ease: 'Power2', onComplete: () => t.destroy() });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // QUESTS TAB
+  // ════════════════════════════════════════════════════════════════════
+
+  buildQuests() {
+    if (!window.QUESTS || !window.GameState.questProgress) {
+      this._contentObjs.push(this.add.text(480, 300, 'No quests available.', {
+        fontSize: '16px', fontFamily: 'monospace', color: '#554455'
+      }).setOrigin(0.5));
+      return;
+    }
+
+    const qs = window.GameState.questProgress;
+    const statusColor = {
+      locked:   '#333344',
+      active:   '#aaaaff',
+      complete: '#ffd700',
+      claimed:  '#44cc88',
+    };
+    const statusLabel = {
+      locked:   '🔒 LOCKED',
+      active:   '⚔ ACTIVE',
+      complete: '★ READY TO CLAIM',
+      claimed:  '✓ COMPLETE',
+    };
+
+    // Header
+    this._contentObjs.push(this.add.text(480, 110, 'QUESTS', {
+      fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: '#cc88ff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5, 0));
+
+    // Stats bar
+    const totalQ  = window.QUESTS.length;
+    const doneQ   = window.QUESTS.filter(q => qs[q.id]?.status === 'claimed').length;
+    this._contentObjs.push(this.add.text(480, 140, 'Progress: ' + doneQ + ' / ' + totalQ + ' quests completed', {
+      fontSize: '13px', fontFamily: 'monospace', color: '#6655aa',
+    }).setOrigin(0.5, 0));
+
+    // Progress bar
+    const barW = 600, barH = 8;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x221133); bg.fillRoundedRect(480 - barW/2, 162, barW, barH, 4);
+    bg.fillStyle(0x8844ff); bg.fillRoundedRect(480 - barW/2, 162, Math.round(barW * doneQ / totalQ), barH, 4);
+    this._contentObjs.push(bg);
+
+    // Quest list
+    let y = 192;
+    window.QUESTS.forEach(quest => {
+      const state = qs[quest.id] || { status: 'locked', progress: 0 };
+      const col   = statusColor[state.status] || '#444444';
+      const label = statusLabel[state.status]  || '?';
+      const isLocked = state.status === 'locked';
+
+      // Quest card background
+      const card = this.add.graphics();
+      const cardAlpha = isLocked ? 0.4 : 0.8;
+      card.fillStyle(isLocked ? 0x111122 : 0x110a22, cardAlpha);
+      card.fillRoundedRect(40, y - 2, 880, 66, 6);
+      if (!isLocked) {
+        card.lineStyle(1, isLocked ? 0x222233 : 0x443366);
+        card.strokeRoundedRect(40, y - 2, 880, 66, 6);
+      }
+      this._contentObjs.push(card);
+
+      // Quest name
+      this._contentObjs.push(this.add.text(60, y + 4, quest.name, {
+        fontSize: '16px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: isLocked ? '#333344' : '#eeddff',
+        stroke: '#000', strokeThickness: 2,
+      }));
+
+      // Status badge
+      this._contentObjs.push(this.add.text(880, y + 4, label, {
+        fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: col,
+      }).setOrigin(1, 0));
+
+      // Description
+      if (!isLocked) {
+        this._contentObjs.push(this.add.text(60, y + 24, quest.description.replace(/\n/g, '  '), {
+          fontSize: '11px', fontFamily: 'monospace', color: '#8877aa',
+          wordWrap: { width: 620 },
+        }));
+
+        // Objective progress bar
+        const obj      = quest.objective;
+        const needed   = obj.count || 1;
+        const prog     = Math.min(state.progress, needed);
+        const progStr  = obj.type.startsWith('kill_boss') ? (prog >= 1 ? '1/1' : '0/1')
+                                                          : prog + '/' + needed;
+
+        this._contentObjs.push(this.add.text(60, y + 46, 'Progress: ' + progStr, {
+          fontSize: '10px', fontFamily: 'monospace',
+          color: state.status === 'claimed' ? '#44cc88' : '#6655aa',
+        }));
+
+        // Mini progress bar
+        const miniW = 200;
+        const miniGfx = this.add.graphics();
+        miniGfx.fillStyle(0x221133); miniGfx.fillRoundedRect(160, y + 48, miniW, 5, 2);
+        const fill = state.status === 'claimed' ? miniW : Math.round(miniW * prog / needed);
+        miniGfx.fillStyle(state.status === 'claimed' ? 0x44cc88 : 0x8844ff);
+        miniGfx.fillRoundedRect(160, y + 48, fill, 5, 2);
+        this._contentObjs.push(miniGfx);
+
+        // Reward preview
+        const rewardStr = '+' + quest.reward.gold + 'G' +
+          (quest.reward.card && window.CARD_MAP?.[quest.reward.card] ?
+            '  +' + window.CARD_MAP[quest.reward.card].name : '');
+        this._contentObjs.push(this.add.text(880, y + 24, 'Reward: ' + rewardStr, {
+          fontSize: '11px', fontFamily: 'monospace', color: '#cc9944',
+        }).setOrigin(1, 0));
+
+        // NPC location hint
+        this._contentObjs.push(this.add.text(880, y + 40, 'NPC: ' + quest.npc, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#554477',
+        }).setOrigin(1, 0));
+      }
+
+      y += 74;
+    });
   }
 }

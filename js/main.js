@@ -1,25 +1,105 @@
 // BloodDungeon — main entry point
 
-// ── Global Game State ────────────────────────────────────────────────────────
-window.GameState = {
-  playerMoney:      5000,
-  playerDeck:       [...window.STARTER_DECK],   // 30 card IDs
-  playerCollection: [...window.STARTER_DECK],   // all owned cards
-  bossesDefeated:   [],
-  playerX:          null,
-  playerY:          null,
-  spawnX:           0,
-  spawnY:           0,
-  defeatedEnemy:    null,
-  currentEnemy:     null,
+// ── Default Game State Factory ────────────────────────────────────────────────
+window.resetGameState = function() {
+  window.GameState = {
+    playerMoney:      200,
+    playerDeck:       [...window.STARTER_DECK],
+    playerCollection: [...window.STARTER_DECK],
+    bossesDefeated:   [],
+    playerX:          null,
+    playerY:          null,
+    spawnX:           0,
+    spawnY:           0,
+    defeatedEnemy:    null,
+    currentEnemy:     null,
+    hearts:           3,
+    maxHearts:        3,
+    checkpoint:       null,
+    echoGold:         0,
+    echoX:            null,
+    echoY:            null,
+    explored:         new Set(),
+    mapData:          null,
+    enemyPositions:   [],
+    questProgress:    window.initQuestState(),
+    // Counters for quest tracking
+    totalKills:       0,
+    hardKills:        0,
+    chestsOpened:     0,
+    currentEnemySpawnId: null,
+  };
 };
+
+// ── Save / Load (localStorage) ────────────────────────────────────────────────
+window.saveGame = function() {
+  try {
+    const gs = window.GameState;
+    const data = {
+      playerMoney:    gs.playerMoney,
+      playerDeck:     gs.playerDeck,
+      playerCollection: gs.playerCollection,
+      bossesDefeated: gs.bossesDefeated,
+      hearts:         gs.hearts,
+      maxHearts:      gs.maxHearts,
+      checkpoint:     gs.checkpoint,
+      echoGold:       gs.echoGold,
+      echoX:          gs.echoX,
+      echoY:          gs.echoY,
+      explored:       [...gs.explored],
+      questProgress:  gs.questProgress,
+      totalKills:     gs.totalKills || 0,
+      hardKills:      gs.hardKills  || 0,
+      chestsOpened:   gs.chestsOpened || 0,
+      savedAt:        Date.now(),
+    };
+    localStorage.setItem('blooddungeon_save', JSON.stringify(data));
+    return true;
+  } catch(e) {
+    console.warn('Save failed:', e);
+    return false;
+  }
+};
+
+window.loadGame = function() {
+  try {
+    const raw = localStorage.getItem('blooddungeon_save');
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+
+    window.resetGameState();
+    const gs = window.GameState;
+    gs.playerMoney      = data.playerMoney     ?? 200;
+    gs.playerDeck       = data.playerDeck      ?? [...window.STARTER_DECK];
+    gs.playerCollection = data.playerCollection ?? [...window.STARTER_DECK];
+    gs.bossesDefeated   = data.bossesDefeated  ?? [];
+    gs.hearts           = data.hearts          ?? 3;
+    gs.maxHearts        = data.maxHearts       ?? 3;
+    gs.checkpoint       = data.checkpoint      ?? null;
+    gs.echoGold         = data.echoGold        ?? 0;
+    gs.echoX            = data.echoX           ?? null;
+    gs.echoY            = data.echoY           ?? null;
+    gs.explored         = new Set(data.explored || []);
+    gs.questProgress    = data.questProgress   ?? window.initQuestState();
+    gs.totalKills       = data.totalKills      ?? 0;
+    gs.hardKills        = data.hardKills       ?? 0;
+    gs.chestsOpened     = data.chestsOpened    ?? 0;
+    return true;
+  } catch(e) {
+    console.warn('Load failed:', e);
+    return false;
+  }
+};
+
+// ── Init GameState (new game) ─────────────────────────────────────────────────
+window.resetGameState();
 
 // ── Phaser Game Config ────────────────────────────────────────────────────────
 const config = {
   type: Phaser.AUTO,
   width:  960,
   height: 640,
-  backgroundColor: '#0a0a12',
+  backgroundColor: '#050508',
   pixelArt: true,
   roundPixels: true,
   scale: {
@@ -30,7 +110,7 @@ const config = {
     default: 'arcade',
     arcade:  { gravity: { y: 0 }, debug: false },
   },
-  scene: [PreloadScene, WorldScene, BattleScene, HUDScene, MenuScene],
+  scene: [TitleScene, PreloadScene, WorldScene, BattleScene, HUDScene, MenuScene],
 };
 
 new Phaser.Game(config);

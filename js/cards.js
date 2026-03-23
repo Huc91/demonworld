@@ -256,26 +256,47 @@ window.CARDS = [
     desc: 'Every fallen soul feeds its curse.',
   },
 
-  // ── OSIRIS PIECES ─────────────────────────────────────────────
+  // ── OSIRIS FRAGMENTS ──────────────────────────────────────────
+  // Lore: God was not slain. God was shattered and sealed inside five cards
+  //       by the Last Demon Council — humans as they are today.
+  //       Rumour says a sixth fragment still exists. Roger knew.
   { id: 'demon_031', name: 'Left Arm of Osiris',  type: 'demon', cost: 1, manaValue: 1, atk: 0, hp: 1, rarity: 'legendary',
     ability: 'osiris_piece', abilityDesc: 'If you hold all 5 Osiris pieces, win instantly.',
-    desc: 'Part of the shattered god.',
+    desc: '"...the left arm reached for mercy but found only chains." — Fragment I, House of Silence',
   },
   { id: 'demon_032', name: 'Right Arm of Osiris', type: 'demon', cost: 1, manaValue: 1, atk: 0, hp: 1, rarity: 'legendary',
     ability: 'osiris_piece', abilityDesc: 'If you hold all 5 Osiris pieces, win instantly.',
-    desc: 'Part of the shattered god.',
+    desc: '"...it struck the Council but they had already become something the old god could not harm." — Fragment II',
   },
   { id: 'demon_033', name: 'Head of Osiris',      type: 'demon', cost: 1, manaValue: 1, atk: 1, hp: 1, rarity: 'legendary',
     ability: 'osiris_piece', abilityDesc: 'If you hold all 5 Osiris pieces, win instantly.',
-    desc: 'Part of the shattered god.',
+    desc: '"The god looked upon humans and knew: it was looking at itself." — Fragment III, Shattered Codex',
   },
   { id: 'demon_034', name: 'Left Leg of Osiris',  type: 'demon', cost: 0, manaValue: 1, atk: 1, hp: 1, rarity: 'legendary',
     ability: 'osiris_piece', abilityDesc: 'If you hold all 5 Osiris pieces, win instantly.',
-    desc: 'Part of the shattered god.',
+    desc: '"It tried to flee. But humans had inherited the god\'s own speed." — Fragment IV',
   },
   { id: 'demon_035', name: 'Right Leg of Osiris', type: 'demon', cost: 0, manaValue: 1, atk: 1, hp: 1, rarity: 'legendary',
     ability: 'osiris_piece', abilityDesc: 'If you hold all 5 Osiris pieces, win instantly.',
-    desc: 'Part of the shattered god.',
+    desc: '"The war ended not with blood, but with a card. And silence." — Fragment V, The Last Council',
+  },
+
+  // ── THE GOD CARD ───────────────────────────────────────────────
+  // Hidden by Roger D. Richard 20 years ago. Finding this makes you Card King.
+  // Lore hint: this IS the god. Reconstituted. The final demon. The first.
+  {
+    id: 'god_card',
+    name: 'ROGER\'S CARD — ◈ THE FIRST ONE ◈',
+    type: 'demon',
+    subtype: 'dark',
+    cost: 0,
+    manaValue: 0,
+    atk: 0,
+    hp: 0,
+    rarity: 'legendary',
+    ability: 'god_card',
+    abilityDesc: '◈ CARD KING ◈ — You are now god. The world bows to your will.',
+    desc: '"I found it. I held it. I laughed. Then I hid it again, because some doors should only be opened once."\n— R.D. Roger, Last Entry',
   },
 
   // ── UTILITY DEMONS ───────────────────────────────────────────

@@ -115,3 +115,54 @@ Press `M` or `ESC` in the overworld to open the menu. Three tabs:
 
 **Player starts with a starter deck** because `GameState.playerDeck` comes from `STARTER_DECK` — a balanced 30-card set of cheap demons and utility spells. The player upgrades it by winning cards in battles.
 
+
+---
+
+## 2026-03-23 — Milestone 1: Core Infrastructure
+
+### Features Added
+
+**Title Screen (TitleScene.js)**
+- Animated starfield background (220 twinkling stars)
+- Blood moon top-right with multi-layer glow
+- Castle/dungeon silhouette with lit windows
+- "DEVIL SUMMONER" pulsing title, "BLOODDUNGEON" subtitle
+- NEW GAME / CONTINUE buttons (CONTINUE auto-detects localStorage save)
+- Lore teaser: "Twenty years ago, Roger hid the most powerful card ever made..."
+
+**Save/Load System (main.js)**
+- window.saveGame() — serializes GameState to localStorage (blooddungeon_save)
+- window.loadGame() — deserializes and restores all state gracefully
+- window.resetGameState() — fresh GameState factory
+- Auto-save after every battle win and chest open
+
+**Quest System (quests.js + WorldScene + MenuScene + HUDScene)**
+- 7 quests with chain prereqs and escalating rewards
+- Types: kill_any, kill_hard, kill_boss_id, defeat_bosses, open_chests
+- window.initQuestState() / window.advanceQuests(event) — clean API
+- Pop-up notifications on completion, unlock notifications for new quests
+- QUESTS tab in MenuScene with progress bars, status badges, NPC names, rewards
+- Active quest tracker in HUD bottom-left
+
+**NPC System (WorldScene.js)**
+- buildNPCs() — spawns at all quest-giver positions from QUESTS data
+- Procedural purple-mage NPC texture (32x32)
+- Bobbing animation + yellow ! marker for active quests
+- _talkToNPC() — context-aware dialogue box based on quest status
+- _dialogueActive guard prevents re-triggering
+
+**Story / Lore: One Piece + Dark Souls tone**
+- Osiris piece flavor texts: cryptic Poneglyph-style inscriptions hinting at the war
+- God Card added (god_card) — Roger D. Richard's legendary card, final quest reward
+- Central mystery: "Humans ARE demons. The last perfected form. They killed god."
+- Becoming Card King = becoming god. Final choice: destroy world or rebuild.
+- Quest dialogues build the mystery across 7 conversations
+
+**Bugs Fixed**
+- buildAnimals() never called in create() — now called
+- Enemy spawnId not tracked — now set on sprite, stored in GameState.currentEnemySpawnId
+- Quest progress not initialized on startup — fixed
+- F key guard during dialogue — won't re-trigger interact while dialog open
+- Screen shake added on battle encounter (cameras.main.shake)
+- BattleScene passes enemyDef + bossId in battleWon event
+

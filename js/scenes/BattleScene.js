@@ -1725,11 +1725,15 @@ class BattleScene extends Phaser.Scene {
       );
     }
 
+    if (card.type === 'demon' && card.desc) {
+      this._zoomObjs.push(
+        this.add.text(px, py + (card.abilityDesc ? 78 : 54), card.desc, {
+          fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
+          wordWrap: { width: W-24 }, align: 'center'
+        }).setOrigin(0.5, 0).setDepth(25.1)
+      );
+    }
     this._zoomObjs.push(
-      this.add.text(px, py + (card.type==='demon' ? (card.abilityDesc ? 78 : 54) : (card.abilityDesc ? 54 : 34)), card.desc || '', {
-        fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
-        wordWrap: { width: W-24 }, align: 'center'
-      }).setOrigin(0.5, 0).setDepth(25.1),
       this.add.text(px, py+H/2-10, (card.rarity||'common').toUpperCase(), {
         fontSize: '10px', fontFamily: 'monospace',
         color: { common:'#888888', uncommon:'#cccccc', rare:'#2266cc', mythic:'#9933cc', legendary:'#ff6600' }[card.rarity] || '#888888'
@@ -2289,7 +2293,13 @@ class BattleScene extends Phaser.Scene {
         stroke: '#000', strokeThickness: 4
       }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => {
-        this.scene.get('WorldScene').events.emit('battleWon', { money, card: cardDrop });
+        this.scene.get('WorldScene').events.emit('battleWon', {
+          money,
+          card: cardDrop,
+          enemyDef: this.enemyDef,
+          bossId: window.GameState.currentEnemySpawnId || null,
+        });
+        window.GameState.currentEnemySpawnId = null;
         this.scene.stop(); this.scene.resume('WorldScene');
       });
       btn.on('pointerover', () => btn.setStyle({ color: '#88ff88' }));

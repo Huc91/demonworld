@@ -46,6 +46,14 @@ class HUDScene extends Phaser.Scene {
       fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa'
     }).setDepth(51);
 
+    // Active quest tracker (bottom-left)
+    this.questHintBg = this.add.graphics().setDepth(40);
+    this.questHintText = this.add.text(10, 630, '', {
+      fontSize: '10px', fontFamily: 'monospace',
+      color: '#aa88ff', stroke: '#000', strokeThickness: 2,
+      backgroundColor: '#00000066', padding: { x: 6, y: 3 },
+    }).setDepth(41).setOrigin(0, 1);
+
     // Reward text placeholder
     this.rewardText = null;
 
@@ -67,6 +75,24 @@ class HUDScene extends Phaser.Scene {
     this.deckText.setText('Deck: ' + window.GameState.playerDeck.length + ' cards');
     this.collectionText.setText('Collection: ' + window.GameState.playerCollection.length);
     this._renderHearts();
+    this._renderActiveQuest();
+  }
+
+  _renderActiveQuest() {
+    if (!this.questHintText) return;
+    const qs = window.GameState.questProgress;
+    if (!qs || !window.QUESTS) return;
+    const active = window.QUESTS.find(q => qs[q.id]?.status === 'active');
+    if (!active) {
+      this.questHintText.setText('');
+      return;
+    }
+    const state = qs[active.id];
+    const obj   = active.objective;
+    const needed = obj.count || 1;
+    const prog   = Math.min(state.progress, needed);
+    const progStr = obj.type.startsWith('kill_boss') ? (prog >= 1 ? '1/1' : '0/1') : prog + '/' + needed;
+    this.questHintText.setText('⚔ Quest: ' + active.name + '  [' + progStr + ']  — ' + active.npc);
   }
 
   _renderHearts() {
