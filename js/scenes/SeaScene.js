@@ -156,6 +156,9 @@ class SeaScene extends Phaser.Scene {
       delay: 600, duration: 800, ease: 'Power2',
     });
 
+    // ── Sea event (40% chance) ────────────────────────────────────────────
+    this._seaEvent();
+
     // ── Transition after 3s ───────────────────────────────────────────────
     this.time.delayedCall(3200, () => {
       // Ship sails off right
@@ -176,6 +179,115 @@ class SeaScene extends Phaser.Scene {
       window.GameState.mapData        = null;
       window.saveGame();
       this.scene.start('WorldScene');
+    });
+  }
+
+  _seaEvent() {
+    if (Math.random() > 0.40) return; // 40% chance
+
+    const SEA_EVENTS = [
+      {
+        title: 'FLOATING WRECKAGE',
+        body:  'Your crew pulls a waterlogged chest from the waves.\nContents: scattered gold coins.',
+        reward: () => {
+          const g = 50 + Math.floor(Math.random() * 100);
+          window.GameState.playerMoney = (window.GameState.playerMoney || 0) + g;
+          return '+' + g + 'G found!';
+        },
+        color: '#ffd700',
+      },
+      {
+        title: 'MYSTERIOUS BOTTLE',
+        body:  'A sealed bottle bobs alongside the hull.\nInside: a folded card.',
+        reward: () => {
+          const pool = window.CARDS.filter(c => c.rarity === 'uncommon' || c.rarity === 'rare');
+          const card = pool[Math.floor(Math.random() * pool.length)];
+          if (card) {
+            window.GameState.playerCollection.push(card.id);
+            if (window.GameState.playerDeck.length < 40) window.GameState.playerDeck.push(card.id);
+          }
+          return card ? 'Found: ' + card.name + '!' : 'Nothing useful inside.';
+        },
+        color: '#88ccff',
+      },
+      {
+        title: 'PASSING MERCHANT',
+        body:  'A small merchant vessel sails alongside.\nThey toss you a gift before sailing off.',
+        reward: () => {
+          const g = 30 + Math.floor(Math.random() * 70);
+          window.GameState.playerMoney = (window.GameState.playerMoney || 0) + g;
+          return '+' + g + 'G  —  "Safe travels!"';
+        },
+        color: '#ffcc44',
+      },
+      {
+        title: 'SEA SERPENT SIGHTING',
+        body:  '"Something massive passed beneath us.\nThe crew is shaken, but we sail on."',
+        reward: () => null,
+        color: '#88ff88',
+      },
+      {
+        title: 'ANCIENT CHART',
+        body:  'A waterproof scroll describes a forgotten island route.\nYou add the knowledge to your charts.',
+        reward: () => {
+          // Give a random card from the destination island pool
+          const destPools = [
+            [],
+            ['demon_106','demon_107','demon_108','demon_109','demon_110'],
+            ['demon_112','demon_113','demon_114','demon_115','demon_116'],
+          ];
+          const pool = destPools[this._dest] || [];
+          if (!pool.length) {
+            const g = 80;
+            window.GameState.playerMoney = (window.GameState.playerMoney || 0) + g;
+            return '+' + g + 'G from salvaged trade goods.';
+          }
+          const id = pool[Math.floor(Math.random() * pool.length)];
+          const card = window.CARD_MAP?.[id];
+          if (card) {
+            window.GameState.playerCollection.push(id);
+            if (window.GameState.playerDeck.length < 40) window.GameState.playerDeck.push(id);
+            return 'Found island card: ' + card.name + '!';
+          }
+          return 'Nothing useful.';
+        },
+        color: '#cc88ff',
+      },
+    ];
+
+    const evt = SEA_EVENTS[Math.floor(Math.random() * SEA_EVENTS.length)];
+    const rewardMsg = evt.reward();
+
+    const W = 960, H = 640;
+    const EW = 480, EH = 120;
+    const ex = W/2 - EW/2, ey = H - 200;
+
+    this.time.delayedCall(1400, () => {
+      const bg = this.add.graphics().setDepth(15);
+      bg.fillStyle(0x05050f, 0.93);
+      bg.fillRoundedRect(ex, ey, EW, EH, 8);
+      bg.lineStyle(2, Phaser.Display.Color.HexStringToColor(evt.color.replace('#','0x')).color || 0x4488ff);
+      bg.strokeRoundedRect(ex, ey, EW, EH, 8);
+      bg.setAlpha(0);
+
+      const t1 = this.add.text(ex + EW/2, ey + 14, '-- ' + evt.title + ' --', {
+        fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: evt.color, stroke: '#000', strokeThickness: 3
+      }).setOrigin(0.5, 0).setDepth(16).setAlpha(0);
+
+      const t2 = this.add.text(ex + EW/2, ey + 36, evt.body, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
+        align: 'center', wordWrap: { width: EW - 20 }
+      }).setOrigin(0.5, 0).setDepth(16).setAlpha(0);
+
+      const t3 = rewardMsg ? this.add.text(ex + EW/2, ey + EH - 22, rewardMsg, {
+        fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: '#ffd700', stroke: '#000', strokeThickness: 2
+      }).setOrigin(0.5, 0).setDepth(16).setAlpha(0) : null;
+
+      [bg, t1, t2, ...(t3 ? [t3] : [])].forEach(o => {
+        this.tweens.add({ targets: o, alpha: 1, duration: 500, ease: 'Power2' });
+      });
     });
   }
 
