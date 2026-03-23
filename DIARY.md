@@ -192,3 +192,56 @@ Press `M` or `ESC` in the overworld to open the menu. Three tabs:
 - Ending sequences use delayedCall chaining instead of complex state machines — clean and easy to iterate
 - `_boardDemonX()` mirrors the render logic so particle position matches card visually even when board is partially filled
 - `_flashScreen()` lives at depth 97, below particles (99) and popups — won't interfere with UI
+
+---
+
+## 2026-03-23 — Milestone 5: Island System + GBA Particles + 26 New Cards
+
+### Island Travel System
+- **SeaScene.js** (new scene): Animated ocean travel between islands. Procedural ship sprite with sails and wake trail. Wave scrolling with GBA-style pixel lines. 3.2s voyage animation then fades to WorldScene.
+- `GameState.currentIsland` (0=home, 1=inferno, 2=frost) + `visitedIslands` added to save/load
+- Harbor Master Kael at Eastern Harbor (home): opens a real travel menu with island destination buttons
+- Each remote island has a "Sail Home" return boat
+
+### Three Worlds
+- **Home Island** (320×200 tiles): original world unchanged. Background color `#0a0a12` (dark night)
+- **Inferno Island** (160×120 tiles): volcanic biome. SAND tiles tinted `#ff6622` (lava), WATER tinted `#ff2200` (lava lake), GRAVE_GRASS tinted `#554433` (ash). Features: caldera fortress, ash plains, survivor village, ruined fortress. Spawn col=20 row=60.
+- **Frost Wastes** (160×120 tiles): ice biome. GRASS tinted `#ddeeff` (snow), WATER tinted `#88aadd` (frozen lake), GRAVE_GRASS as deep snow. Features: glacial ruins, ice fortress, east coast village, frozen lake. Spawn col=140 row=60.
+
+### GBA-Style Visual System
+- **Death particles**: 8-direction 2×2–6×6 pixel squares, linear 140ms travel, snap to white 4×4 pixel, then disappear. No smooth alpha fades.
+- **Screen flash**: Solid full-screen rectangle for 50ms, instant destroy. No tween.
+- **Weather system**: ~12fps update renders 1–2px square particles via scrollFactor=0 Graphics layer:
+  - Swamp: rain (vertical blue streaks)
+  - Desert: sand drift (diagonal tan particles)
+  - Inferno: ash fall (slow drifting grey squares)
+  - Frost: snowfall (white square flurry)
+- **Victory burst**: 16 pixel squares in 16 directions for normal wins; 32 for boss kills (gold/white)
+
+### 26 New Cards + 14 New Enemies
+- **6 fire demon cards** (demon_106–111): Lava Imp, Cinder Hound, Magma Golem, Inferno Drake, Ember Phoenix, Volcano Lord
+- **6 frost demon cards** (demon_112–117): Frost Rat, Blizzard Imp, Glacier Drake, Frost Wraith, Permafrost Titan, Glacial Sovereign
+- **3 new spells** (spell_059–061): Magma Burst (dmg 5), Blizzard (AOE 3), Lava Shield (+4 HP)
+- **7 inferno enemies** (indices 12–18): Ash Crawler → Magma King (boss, 35 HP)
+- **7 frost enemies** (indices 19–25): Ice Gnome → Glacier Sovereign (boss, 35 HP)
+- Island chest loot tables: inferno drops fire cards, frost drops ice cards
+
+### 4 New Island Quests
+- **q_inf1** "Trial by Fire" — Survivor Kira, inferno village. Kill 4 enemies. Reward: 500G + Inferno Drake
+- **q_inf2** "Into the Caldera" — Scout Veln, caldera approach. Defeat Magma King. Reward: 1500G + Volcano Lord
+- **q_fr1** "Cold Welcome" — Frost Elder Siv, east village. Kill 4 enemies. Reward: 500G + Glacier Drake
+- **q_fr2** "The Glacier Sovereign" — Ice Warden Vex, fortress approach. Defeat Glacier Sovereign. Reward: 1800G + Glacial Sovereign
+- NPCs spawn on the correct island (`quest.island` field added to all quests)
+- Quest menu shows `[INFERNO]` / `[FROST]` island badge next to NPC name
+
+### Bugs Fixed
+- Island poneglyph interaction broken (used wrong object format) — fixed to use `{sprite, px, py, lore, read}`
+- Island enemy index off-by-one (`inf(n) = E[12+n]` → `E[11+n]`) — corrected
+- `buildNPCs()` returned early on non-home islands — now filters by `quest.island`
+- Campfire/chest `const positions` redeclaration in else-block — changed to `let` assignment
+
+### Architecture
+- WorldScene dispatch pattern: `buildMap()` checks `currentIsland` and calls `buildMap_home/inferno/frost()`
+- `_spawnEnemyList(spawns, TINT)` shared helper eliminates duplicate overlap/collider setup
+- Island camera backgrounds: `['#0a0a12', '#1a0800', '#050a14']` indexed by island
+- SeaScene resets `playerX/Y/checkpoint/explored/mapData` before WorldScene restart

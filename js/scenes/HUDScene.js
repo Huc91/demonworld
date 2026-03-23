@@ -25,7 +25,9 @@ class HUDScene extends Phaser.Scene {
     // Hearts container (right of collection text)
     this.heartsContainer = this.add.container(580, 8);
 
-    this.add.text(680, 10, 'WASD: Move  |  F: Interact  |  Space: Jump  |  M: Menu  |  World: 320×200', {
+    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes'];
+    const islandName = ISLAND_NAMES[window.GameState?.currentIsland || 0] || 'Home Island';
+    this.add.text(680, 10, 'WASD: Move  |  F: Interact  |  Space: Jump  |  M: Menu  |  ' + islandName, {
       fontSize: '10px', fontFamily: 'monospace',
       color: '#888888', stroke: '#000', strokeThickness: 2
     });
@@ -82,7 +84,10 @@ class HUDScene extends Phaser.Scene {
     if (!this.questHintText) return;
     const qs = window.GameState.questProgress;
     if (!qs || !window.QUESTS) return;
-    const active = window.QUESTS.find(q => qs[q.id]?.status === 'active');
+    const currentIsland = window.GameState.currentIsland || 0;
+    // Prefer quests matching current island; fall back to any active quest
+    const active = window.QUESTS.find(q => (q.island ?? 0) === currentIsland && qs[q.id]?.status === 'active')
+                || window.QUESTS.find(q => qs[q.id]?.status === 'active');
     if (!active) {
       this.questHintText.setText('');
       return;
@@ -117,7 +122,8 @@ class HUDScene extends Phaser.Scene {
     if (!mapData) return;
 
     const MW = 200, MH = 150;
-    const COLS = 320, ROWS = 200;
+    const ROWS = mapData.length || 200;
+    const COLS = (mapData[0] && mapData[0].length) || 320;
     const scaleX = MW / COLS;
     const scaleY = MH / ROWS;
 

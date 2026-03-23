@@ -942,9 +942,11 @@ class MenuScene extends Phaser.Scene {
           fontSize: '11px', fontFamily: 'monospace', color: '#cc9944',
         }).setOrigin(1, 0));
 
-        // NPC location hint
-        this._contentObjs.push(this.add.text(880, y + 40, 'NPC: ' + quest.npc, {
-          fontSize: '10px', fontFamily: 'monospace', color: '#554477',
+        // NPC location hint + island badge
+        const islandBadge = quest.island === 1 ? ' [INFERNO]' : quest.island === 2 ? ' [FROST]' : '';
+        const islandBadgeColor = quest.island === 1 ? '#ff6622' : quest.island === 2 ? '#88ccff' : '#554477';
+        this._contentObjs.push(this.add.text(880, y + 40, 'NPC: ' + quest.npc + islandBadge, {
+          fontSize: '10px', fontFamily: 'monospace', color: islandBadgeColor,
         }).setOrigin(1, 0));
       }
 

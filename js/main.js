@@ -86,6 +86,15 @@ window.loadGame = function() {
     gs.echoY            = data.echoY           ?? null;
     gs.explored         = new Set(data.explored || []);
     gs.questProgress    = data.questProgress   ?? window.initQuestState();
+    // Backfill any quests added after the save was created
+    if (window.QUESTS) {
+      window.QUESTS.forEach(q => {
+        if (!gs.questProgress[q.id]) {
+          const autoActive = !q.prereq && q.island !== undefined && q.island !== 0;
+          gs.questProgress[q.id] = { status: autoActive ? 'active' : 'locked', progress: 0 };
+        }
+      });
+    }
     gs.totalKills       = data.totalKills      ?? 0;
     gs.hardKills        = data.hardKills       ?? 0;
     gs.chestsOpened     = data.chestsOpened    ?? 0;

@@ -12,6 +12,7 @@
 window.QUESTS = [
   {
     id: 'q001',
+    island: 0,
     name: 'First Blood',
     npc: 'Elder Seraphon',
     npcTileX: 120, npcTileY: 109,   // Main town plaza
@@ -28,6 +29,7 @@ window.QUESTS = [
   },
   {
     id: 'q002',
+    island: 0,
     name: 'Swamp Plague',
     npc: 'Swamp Hermit Grak',
     npcTileX: 33, npcTileY: 158,    // Swamp path campfire
@@ -44,6 +46,7 @@ window.QUESTS = [
   },
   {
     id: 'q003',
+    island: 0,
     name: 'Echoes of the Old War',
     npc: 'Scholar Aldus',
     npcTileX: 197, npcTileY: 72,    // Village 2 plaza
@@ -60,6 +63,7 @@ window.QUESTS = [
   },
   {
     id: 'q004',
+    island: 0,
     name: 'Into the Dungeon',
     npc: 'Captain Vorn',
     npcTileX: 188, npcTileY: 46,    // Dungeon 1 approach campfire
@@ -76,6 +80,7 @@ window.QUESTS = [
   },
   {
     id: 'q005',
+    island: 0,
     name: 'The Graveyard King',
     npc: 'Grave Warden Mirra',
     npcTileX: 169, npcTileY: 153,   // Graveyard path campfire
@@ -92,6 +97,7 @@ window.QUESTS = [
   },
   {
     id: 'q006',
+    island: 0,
     name: 'Champion of the Sands',
     npc: 'Arena Master Dusk',
     npcTileX: 250, npcTileY: 92,    // Deep desert outpost campfire
@@ -108,6 +114,7 @@ window.QUESTS = [
   },
   {
     id: 'q007',
+    island: 0,
     name: 'The Card King',
     npc: 'Elder Seraphon',
     npcTileX: 120, npcTileY: 109,   // Main town plaza — same NPC as q001
@@ -120,6 +127,78 @@ window.QUESTS = [
       active:    'I know what you seek. I\'ve always known. Five truths remain. Five seals. When they all break — you will understand everything. And you will have to choose.',
       complete:  'It is done. The god\'s fragments remember you. The Card King\'s crown is not gold. It is weight. Infinite, terrible weight.\n\nWhat you hold is not a card. It is a mirror. And what you see in it — that is what you must decide to do with creation itself.\n\n...Are you ready?',
       claimed:   '"Roger found it. Wept for three days. Then sealed it again and set it free into the world. He said: \'It\'s not mine. It\'s everyone\'s.\'" — Seraphon, whispering',
+    },
+  },
+
+  // ── INFERNO ISLAND QUESTS ──────────────────────────────────────────────
+  {
+    id: 'q_inf1',
+    island: 1,
+    name: 'Trial by Fire',
+    npc: 'Survivor Kira',
+    npcTileX: 26, npcTileY: 97,   // Inferno survivor village interior
+    description: 'The inferno is unforgiving.\nSurvive 4 encounters with its demons.',
+    objective: { type: 'kill_any', count: 4 },
+    reward: { gold: 500, card: 'demon_109', xp: 0 },
+    prereq: null,
+    dialogue: {
+      locked:    '...',
+      active:    'You made it this far. Most don\'t. Kill 4 of those things and come back — I\'ll trade what I know about the caldera.',
+      complete:  'I knew it. You\'re like Roger. He passed through here once, headed north. Said he was going to "ask the volcano a question." Take this card. Keep going.',
+      claimed:   '"The fire does not hate you. It just doesn\'t know you yet." — Survivor Kira',
+    },
+  },
+  {
+    id: 'q_inf2',
+    island: 1,
+    name: 'Into the Caldera',
+    npc: 'Scout Veln',
+    npcTileX: 55, npcTileY: 38,   // Inferno lava plains, caldera approach
+    description: 'The Magma King rules the caldera with absolute flame.\nDefeat him and break the cycle.',
+    objective: { type: 'kill_boss_id', bossId: 'boss_inferno' },
+    reward: { gold: 1500, card: 'demon_111', xp: 0 },
+    prereq: 'q_inf1',
+    dialogue: {
+      locked:    'Not yet. Earn your scar first.',
+      active:    'The Magma King has burned a thousand challengers. He carries a memory of the old war. Defeat him — free whatever\'s locked inside.',
+      complete:  'You fought a god\'s echo and won. Among the embers I found a line of old text: "The inferno is a test. Roger passed. He took nothing. He left a word: Remember."',
+      claimed:   '"What he left was not a clue. It was a promise." — Scout Veln',
+    },
+  },
+
+  // ── FROST WASTES QUESTS ────────────────────────────────────────────────
+  {
+    id: 'q_fr1',
+    island: 2,
+    name: 'Cold Welcome',
+    npc: 'Frost Elder Siv',
+    npcTileX: 142, npcTileY: 47,  // Frost east village interior
+    description: 'The Frost Wastes test all who enter.\nSurvive 4 battles in the cold.',
+    objective: { type: 'kill_any', count: 4 },
+    reward: { gold: 500, card: 'demon_114', xp: 0 },
+    prereq: null,
+    dialogue: {
+      locked:    '...',
+      active:    'So you survived the sea. Good. The ice here will test you differently. Kill four of the frost things — come back if you\'re still breathing.',
+      complete:  'You endure. I respect that. Roger was here. He stared at the frozen lake for three days. Said he heard something under the ice. We thought he was mad. Then he smiled and left. Take this.',
+      claimed:   '"The cold does not punish you. It just shows you what you are." — Frost Elder Siv',
+    },
+  },
+  {
+    id: 'q_fr2',
+    island: 2,
+    name: 'The Glacier Sovereign',
+    npc: 'Ice Warden Vex',
+    npcTileX: 95, npcTileY: 80,   // Frost ice fortress approach
+    description: 'The Glacier Sovereign remembers the First Sealing.\nHe must be stopped.',
+    objective: { type: 'kill_boss_id', bossId: 'boss_frost' },
+    reward: { gold: 1800, card: 'demon_117', xp: 0 },
+    prereq: 'q_fr1',
+    dialogue: {
+      locked:    'You are not ready for what lies inside.',
+      active:    'The Glacier Sovereign was one of the seven who sat in the circle. He chose humanity. Then he sealed himself in ice to remember what he had done. Show him it was right.',
+      complete:  'He is free now. Before the ice took him again, he whispered: "The missing card — Roger took it from the circle. It is not a card. It is a seat. The eighth seat." Go. You know where that is.',
+      claimed:   '"He who understands the cold has already found the fire." — Ice Warden Vex',
     },
   },
 ];
@@ -135,10 +214,12 @@ window.QUESTS.forEach(q => { window.QUEST_MAP[q.id] = q; });
 window.initQuestState = function() {
   const state = {};
   window.QUESTS.forEach((q, i) => {
-    state[q.id] = {
-      status: i === 0 ? 'active' : 'locked',
-      progress: 0,
-    };
+    // Home island: q001 starts active, rest locked until prereq met
+    // Island quests with no prereq start active (unlocked from the start)
+    let status = 'locked';
+    if (i === 0) status = 'active';
+    else if (!q.prereq && q.island !== undefined && q.island !== 0) status = 'active';
+    state[q.id] = { status, progress: 0 };
   });
   return state;
 };

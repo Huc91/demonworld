@@ -1227,7 +1227,9 @@ class WorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.mapWidth * TILE, this.mapHeight * TILE);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(1.2);
-    this.cameras.main.setBackgroundColor('#0a0a12');
+    const island = window.GameState.currentIsland || 0;
+    const bgColors = ['#0a0a12', '#1a0800', '#050a14'];
+    this.cameras.main.setBackgroundColor(bgColors[island] || '#0a0a12');
   }
 
   // ─────────────────── CONTROLS ───────────────────────────────────────────
@@ -1398,6 +1400,8 @@ class WorldScene extends Phaser.Scene {
   buildHorses() {
     this.horses       = [];
     this.mountedHorse = null;
+    // No horses on remote islands
+    if ((window.GameState.currentIsland || 0) !== 0) return;
 
     const positions = [
       { x:  90*32+16, y:  60*32+16 },  // west field
@@ -1424,13 +1428,13 @@ class WorldScene extends Phaser.Scene {
   buildNPCs() {
     this.npcs = [];
     if (!window.QUESTS) return;
-    // NPCs only on home island for now (quest givers live there)
-    if ((window.GameState.currentIsland || 0) !== 0) return;
+    const currentIsland = window.GameState.currentIsland || 0;
 
     // Deduplicate NPCs by pixel position (some quests share an NPC)
     const placed = new Map();
 
-    window.QUESTS.forEach(quest => {
+    // Only spawn NPCs belonging to this island
+    window.QUESTS.filter(q => (q.island ?? 0) === currentIsland).forEach(quest => {
       const key = quest.npcTileX + ',' + quest.npcTileY;
       if (placed.has(key)) {
         // Add this quest to the existing NPC
@@ -1500,8 +1504,8 @@ class WorldScene extends Phaser.Scene {
       ];
       infraLore.forEach(pg => {
         const sprite = this.add.sprite(pg.x, pg.y, 'poneglyph').setDepth(8).setScale(0.8).setTint(0xff6622);
-        sprite.pgText = pg.text; sprite.pgRead = false;
-        this.poneglyphs.push(sprite);
+        this.tweens.add({ targets: sprite, alpha: { from: 0.7, to: 1.0 }, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.poneglyphs.push({ sprite, px: pg.x, py: pg.y, lore: pg.text, read: false });
       });
       return;
     }
@@ -1512,8 +1516,8 @@ class WorldScene extends Phaser.Scene {
       ];
       frostLore.forEach(pg => {
         const sprite = this.add.sprite(pg.x, pg.y, 'poneglyph').setDepth(8).setScale(0.8).setTint(0x88aadd);
-        sprite.pgText = pg.text; sprite.pgRead = false;
-        this.poneglyphs.push(sprite);
+        this.tweens.add({ targets: sprite, alpha: { from: 0.7, to: 1.0 }, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.poneglyphs.push({ sprite, px: pg.x, py: pg.y, lore: pg.text, read: false });
       });
       return;
     }
@@ -1614,6 +1618,7 @@ class WorldScene extends Phaser.Scene {
 
   buildAnimals() {
     if (!window.ANIMAL_KEYS || window.ANIMAL_KEYS.length === 0) return;
+    if ((window.GameState.currentIsland || 0) !== 0) return;
     const zones = [
       { r0:  7, r1:  80, c0:  7, c1:  60  },
       { r0:  7, r1:  80, c0: 68, c1: 120  },

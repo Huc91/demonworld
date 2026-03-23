@@ -14,40 +14,92 @@ class PreloadScene extends Phaser.Scene {
         { frameWidth: 32, frameHeight: 32 });
     }
 
-    // Load unique pixel art for each demon card from Free Mythic Monsters pack
-    // (spaces encoded as %20 for reliable URL loading)
-    const BASE = 'Free%20Mythic%20Monsters/Free%20Mythic%20Monsters/Transparent/1x%20Size/';
-    const MAP = {
-      'demon_001': '003_1', // Imp           — red fire creature
-      'demon_002': '021_1', // Hellhound     — fire lion
-      'demon_003': '001_1', // Plague Rat    — scarab/spider
-      'demon_004': '016_1', // Shadow Hound  — blue slime/shadow
-      'demon_005': '004_1', // Bone Knight   — armored warrior
-      'demon_006': '006_1', // Specter       — blue ghost
-      'demon_007': '005_1', // Succubus      — divine warrior
-      'demon_008': '007_1', // Blood Bat     — dark spider
-      'demon_009': '023_1', // Golem         — blue troll/golem
-      'demon_010': '011_1', // Cerberus      — orange multi-limb beast
-      'demon_011': '010_1', // Wraith        — ethereal jellyfish
-      'demon_012': '027_1', // Minotaur      — golden beast
-      'demon_013': '014_1', // Ember Drake   — orange dragon
-      'demon_014': '024_1', // Sand Ghoul    — desert serpent
-      'demon_015': '028_1', // Void Crawler  — ice/void cube
-      'demon_016': '025_1', // Nightmare     — fire demon
-      'demon_017': '031_1', // Iron Djinn    — golden giant
-      'demon_018': '030_1', // Dusk Faerie   — golden phoenix
-      'demon_019': '017_1', // Pit Fiend     — fire wyvern
-      'demon_020': '009_1', // Medusa        — cobra
-      'demon_021': '020_1', // Lich King     — skeleton knight
-      'demon_022': '008_1', // Beelzebub     — wasp (Lord of Flies)
-      'demon_023': '022_1', // Baphomet      — electric dark god
+    // Monsty art — matched by visual to card name/subtype
+    const MONSTY = {
+      'demon_001': 'NB_13', // Imp            — red spiky demon
+      'demon_002': 'NB_30', // Hellhound      — red/gold lion fire mane
+      'demon_003': 'NB_03', // Plague Rat     — spiky hedgehog/beast
+      'demon_004': 'NB_04', // Shadow Hound   — blue wolf/dark
+      'demon_005': 'NB_23', // Bone Knight    — dark blue armored beast
+      'demon_006': 'NB_10', // Specter        — pink ghost blob
+      'demon_007': 'NB_16', // Succubus       — butterfly/barbed wings demon
+      'demon_008': 'NB_17', // Blood Bat      — chubby horned dark creature
+      'demon_009': 'NB_02', // Golem          — gray armored golem
+      'demon_010': 'NB_09', // Cerberus       — orange scorpion/fire beast
+      'demon_011': 'NB_08', // Wraith         — purple ghost with hat
+      'demon_012': 'NB_01', // Minotaur       — bear-like hulking beast
+      'demon_013': 'NB_12', // Ember Drake    — gold dragon with spikes
+      'demon_014': 'NB_14', // Sand Ghoul     — green reptilian beast
+      'demon_015': 'NB_25', // Void Crawler   — black void diamond shapes
+      'demon_016': 'NB_28', // Nightmare      — purple demon snake/coil
+      'demon_017': 'NB_21', // Iron Djinn     — white/blue ghost light form
+      'demon_018': 'NB_24', // Dusk Faerie    — fluffy creature with tail
+      'demon_019': 'NB_26', // Pit Fiend      — red/orange blob spikes fire
+      'demon_020': 'NB_07', // Medusa         — green serpent beast
+      'demon_021': 'NB_15', // Lich King      — red/blue demonic dark creature
+      'demon_022': 'NB_18', // Beelzebub      — green spiky dark creature
+      'demon_023': 'NB_13', // Baphomet       — already used, fallback NB_11
+      'demon_024': 'NB_05', // Mana Wisp      — white/green blob light
+      'demon_025': 'NB_20', // Mana Wraith    — white/blue snowman ice
+      'demon_026': 'NB_19', // Mana Titan     — blue/white cloud light
+      'demon_027': 'NB_27', // Blood Banner   — sturdy beast figure
+      'demon_028': 'NB_29', // Iron Sigil     — white/tan light creature
+      'demon_029': 'NB_11', // Warlord        — armored turtle/rock beast
+      'demon_030': 'NB_06', // Death Knell    — green slime primordial
     };
-    Object.entries(MAP).forEach(([cardId, file]) => {
-      this.load.image('card_art_' + cardId, BASE + file + '.png');
+    // Fix duplicate: Baphomet gets NB_11 (armored), Warlord gets NB_22
+    MONSTY['demon_023'] = 'NB_22'; // Baphomet — blue octopus with horns dark
+    MONSTY['demon_029'] = 'NB_11'; // Warlord  — armored shell beast
+
+    // ── Inferno Island demons (demon_106–111) ─────────────────────────────
+    MONSTY['demon_106'] = 'NB_13'; // Lava Imp         — red spiky demon
+    MONSTY['demon_107'] = 'NB_09'; // Cinder Hound     — orange scorpion fire beast
+    MONSTY['demon_108'] = 'NB_02'; // Magma Golem      — gray armored golem
+    MONSTY['demon_109'] = 'NB_12'; // Inferno Drake    — gold dragon spikes
+    MONSTY['demon_110'] = 'NB_26'; // Ember Phoenix    — red/orange blob fire
+    MONSTY['demon_111'] = 'NB_30'; // Volcano Lord     — red/gold lion fire mane
+
+    // ── Frost Wastes demons (demon_112–117) ──────────────────────────────
+    MONSTY['demon_112'] = 'NB_03'; // Frost Rat        — spiky beast
+    MONSTY['demon_113'] = 'NB_10'; // Blizzard Imp     — ghostly ethereal
+    MONSTY['demon_114'] = 'NB_04'; // Glacier Drake    — blue dark wolf
+    MONSTY['demon_115'] = 'NB_08'; // Frost Wraith     — purple ghost wraith
+    MONSTY['demon_116'] = 'NB_29'; // Permafrost Titan — massive white titan
+    MONSTY['demon_117'] = 'NB_20'; // Glacial Sovereign — white/blue ice form
+
+    Object.entries(MONSTY).forEach(([cardId, file]) => {
+      this.load.image('card_art_' + cardId, 'resources/monsty/' + file + '.png');
     });
   }
 
+  // Remove near-white pixels from a loaded image texture (makes white bg transparent)
+  _stripWhiteBg(key, threshold = 220) {
+    if (!this.textures.exists(key)) return;
+    const src = this.textures.get(key).getSourceImage();
+    const canvas = document.createElement('canvas');
+    canvas.width  = src.width;
+    canvas.height = src.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(src, 0, 0);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] > threshold && d[i+1] > threshold && d[i+2] > threshold) d[i+3] = 0;
+    }
+    ctx.putImageData(img, 0, 0);
+    this.textures.remove(key);
+    this.textures.addCanvas(key, canvas);
+  }
+
   create() {
+    // Strip white backgrounds from monsty images (base set + island demons)
+    for (let i = 1; i <= 30; i++) {
+      this._stripWhiteBg('card_art_demon_' + String(i).padStart(3, '0'));
+    }
+    for (let i = 106; i <= 117; i++) {
+      this._stripWhiteBg('card_art_demon_' + String(i).padStart(3, '0'));
+    }
+
     this.makeTiles();
     this.makePlayer();
     this.makeEnemies();
