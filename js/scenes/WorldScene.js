@@ -64,6 +64,9 @@ class WorldScene extends Phaser.Scene {
     this.buildAnimals();
     this.buildBlacksmith();
 
+    // ── Field of View overlay ────────────────────────────────────────────
+    this._initFoV();
+
     // ── Boss proximity warning (shown once per boss per session) ──────────
     this._bossWarned = new Set();
 
@@ -95,9 +98,6 @@ class WorldScene extends Phaser.Scene {
       window.GameState.playerMoney += reward.money;
       if (reward.card) {
         window.GameState.playerCollection.push(reward.card);
-        if (window.GameState.playerDeck.length < 40) {
-          window.GameState.playerDeck.push(reward.card);
-        }
       }
       if (window.GameState.defeatedEnemy) {
         window.GameState.defeatedEnemy.destroy();
@@ -119,9 +119,9 @@ class WorldScene extends Phaser.Scene {
           if (lv % 5 === 0 && window.GameState.maxHearts < 6) {
             window.GameState.maxHearts++;
             window.GameState.hearts = Math.min(window.GameState.hearts + 1, window.GameState.maxHearts);
-            this.time.delayedCall(1200, () => this.showMessage('LEVEL ' + lv + '! +1 MAX HEART!', '#ff6699'));
+            this.time.delayedCall(1200, () => this._showLevelUpEffect(lv, true));
           } else {
-            this.time.delayedCall(1200, () => this.showMessage('LEVEL UP! Lv.' + lv + '  (+ battle HP)', '#ffd700'));
+            this.time.delayedCall(1200, () => this._showLevelUpEffect(lv, false));
           }
           this.scene.get('HUDScene').updateHUD();
         }
@@ -141,12 +141,14 @@ class WorldScene extends Phaser.Scene {
           bossId: reward.bossId || null,
         };
         const changed = window.advanceQuests(questEvent);
+        if (changed.length) this._buildQuestHUD();
         changed.forEach(qid => {
           const q = window.QUEST_MAP[qid];
           if (q && !qid.endsWith('_unlocked')) {
             this.time.delayedCall(800, () => {
               this.showMessage('QUEST COMPLETE: ' + q.name + '!', '#ffd700');
               this.scene.get('HUDScene').updateHUD();
+              this._buildQuestHUD();
             });
           } else if (qid.endsWith('_unlocked')) {
             const realId = qid.replace('_unlocked', '');
@@ -154,6 +156,7 @@ class WorldScene extends Phaser.Scene {
             if (q2) {
               this.time.delayedCall(1600, () => {
                 this.showMessage('NEW QUEST: ' + q2.name, '#44ff88');
+                this._buildQuestHUD();
               });
             }
           }
@@ -189,9 +192,10 @@ class WorldScene extends Phaser.Scene {
       }
     });
 
-    this.events.on('battleLost', () => {
+    this.events.on('battleLost', (data) => {
+      const hl = data?.heartsLost ?? 2;
       this._killStreak = 0;
-      window.GameState.hearts = Math.max(0, window.GameState.hearts - 1);
+      window.GameState.hearts = Math.max(0, (window.GameState.hearts ?? 3) - hl);
       this.battleCooldown = false;
       this.physics.resume();
 
@@ -199,13 +203,15 @@ class WorldScene extends Phaser.Scene {
         this._triggerDeath();
       } else {
         const cp = window.GameState.checkpoint;
-        if (cp) {
-          this.player.setPosition(cp.x, cp.y);
-        } else {
-          this.player.setPosition(window.GameState.spawnX, window.GameState.spawnY);
-        }
+        const rx = cp ? cp.x : window.GameState.spawnX;
+        const ry = cp ? cp.y : window.GameState.spawnY;
+        this.player.setPosition(rx, ry);
+        // Restore elevation from map data at respawn position
+        const rr = Math.floor(ry / TILE), rc = Math.floor(rx / TILE);
+        this.playerElevation = this.elevMap?.[rr]?.[rc] ?? 0;
+        this.player.setDepth(10 + this.playerElevation * 5);
         this.scene.get('HUDScene').updateHUD();
-        this.showMessage('Lost a heart! ♥ x' + window.GameState.hearts, '#ff4444');
+        this.showMessage('Lost ' + hl + ' heart' + (hl !== 1 ? 's' : '') + '! ♥ x' + window.GameState.hearts, '#ff4444');
       }
     });
   }
@@ -239,7 +245,17 @@ class WorldScene extends Phaser.Scene {
       cf.refresh();
     }
 
-    // ── Chest (32×32) ─────────────────────────────────────────────────────
+    // ── Chest — use Mystic Woods asset if available ───────────────────────
+    if (this.textures.exists('mw_chest') && !this.textures.exists('chest')) {
+      // Copy from mw_chest (pixel art chest sprite) into 'chest' canvas
+      const mwc = this.textures.get('mw_chest').getSourceImage();
+      const ch  = this.textures.createCanvas('chest', 32, 32);
+      const ctx = ch.getContext();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(mwc, 0, 0, mwc.width, mwc.height, 0, 0, 32, 32);
+      ch.refresh();
+    }
+    // ── Chest (32×32) procedural fallback ─────────────────────────────────
     if (!this.textures.exists('chest')) {
       const ch = this.textures.createCanvas('chest', 32, 32);
       const ctx = ch.getContext();
@@ -430,6 +446,7 @@ class WorldScene extends Phaser.Scene {
     const island = window.GameState.currentIsland || 0;
     if (island === 1) { this.buildMap_inferno(); return; }
     if (island === 2) { this.buildMap_frost();   return; }
+    if (island === 3) { this.buildMap_thunder(); return; }
     this.buildMap_home();
   }
 
@@ -437,9 +454,12 @@ class WorldScene extends Phaser.Scene {
     const W = 320, H = 200;
     this.mapWidth  = W;
     this.mapHeight = H;
+    // Spawn at the top of the two-step starter descent (Z=2)
+    this._islandSpawnTile = { x: 121, y: 57 };
 
     const GRASS = 0, DIRT = 1, WATER = 2, WALL = 3, FLOOR = 4,
-          TREE = 5, MOUNTAIN = 6, SAND = 7, GRAVE_GRASS = 8;
+          TREE = 5, MOUNTAIN = 6, SAND = 7, GRAVE_GRASS = 8,
+          CLIFF = 9, LEDGE = 10;
 
     const map = [];
     for (let r = 0; r < H; r++) {
@@ -742,30 +762,186 @@ class WorldScene extends Phaser.Scene {
     // Path to village 4 from graveyard area
     for (let r = 152; r < V4Y1; r++) { set(r, 213, DIRT); set(r, 214, DIRT); }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // ELEVATION SYSTEM — Zelda Minish Cap / Link's Awakening style
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── STARTER DESCENT — player spawns at Z=2, steps down to Z=1, then Z=0
+    // Z=2 platform surface (rows 53–62, cols 113–129) — grass
+    for (let r = 53; r <= 62; r++)
+      for (let c = 113; c <= 129; c++) map[r][c] = GRASS;
+    // Row 63 = cliff face (BOTTOM ROW of Z=2 platform — the brown south wall)
+    for (let c = 113; c <= 129; c++) set(63, c, CLIFF);
+    // Ledge steps cut into the cliff so player can descend
+    set(63, 119, LEDGE); set(63, 120, LEDGE); set(63, 121, LEDGE); set(63, 122, LEDGE);
+
+    // Z=1 platform surface (rows 64–71, cols 109–133) — grass
+    for (let r = 64; r <= 71; r++)
+      for (let c = 109; c <= 133; c++) map[r][c] = GRASS;
+    // Row 72 = cliff face (BOTTOM ROW of Z=1 platform — the brown south wall)
+    for (let c = 109; c <= 133; c++) set(72, c, CLIFF);
+    // Ledge steps so player can descend to Z=0
+    set(72, 119, LEDGE); set(72, 120, LEDGE); set(72, 121, LEDGE); set(72, 122, LEDGE);
+
+    // Z=0 approach (rows 73–79 cleared to dirt path to town gate)
+    for (let r = 73; r <= 79; r++)
+      for (let c = 117; c <= 125; c++) map[r][c] = DIRT;
+
+    // ── Z=3 PEAK HILL — small 3×3 to the right of spawn (cols 131–133, rows 54–56) ──
+    // Clear any trees
+    for (let r = 54; r <= 56; r++)
+      for (let c = 131; c <= 133; c++) map[r][c] = GRASS;
+    // Row 56 = cliff face (bottom row of Z=3 block)
+    for (let c = 131; c <= 133; c++) set(56, c, CLIFF);
+    set(56, 132, LEDGE);  // center ledge for descending
+
+    // ── Area A: Hilltop shrine (north wilderness, elevation 1) ────────────
+    // Rows 30–44 = grass surface; row 45 = cliff (bottom row of platform)
+    for (let r = 30; r <= 44; r++)
+      for (let c = 140; c <= 165; c++)
+        if (map[r][c] === TREE) map[r][c] = GRASS;
+    for (let c = 140; c <= 165; c++) set(45, c, CLIFF);
+    for (let c = 150; c <= 153; c++) set(45, c, LEDGE);
+
+    // ── Area B: Two-tier rocky plateau (north-east, elev 1 then 2) ────────
+    // Z=1 surface rows 25–34; row 35 = cliff (bottom row of Z=1)
+    for (let r = 25; r <= 34; r++)
+      for (let c = 240; c <= 270; c++)
+        if (map[r][c] !== WALL && map[r][c] !== FLOOR) map[r][c] = GRASS;
+    for (let c = 240; c <= 270; c++) set(35, c, CLIFF);
+    set(35, 253, LEDGE); set(35, 254, LEDGE); set(35, 255, LEDGE);
+    // Z=2 surface rows 25–29; row 30 = cliff (bottom row of Z=2)
+    for (let r = 25; r <= 29; r++)
+      for (let c = 252; c <= 262; c++)
+        if (map[r][c] !== WALL && map[r][c] !== FLOOR) map[r][c] = GRASS;
+    for (let c = 252; c <= 262; c++) set(30, c, CLIFF);
+    set(30, 256, LEDGE); set(30, 257, LEDGE);
+
+    // ── Area C: Forest elevated clearing (west, elevation 1) ─────────────
+    // Rows 60–74 = grass surface; row 75 = cliff (bottom row of platform)
+    for (let r = 60; r <= 74; r++)
+      for (let c = 30; c <= 48; c++)
+        if (map[r][c] !== WALL && map[r][c] !== WATER) map[r][c] = GRASS;
+    for (let c = 30; c <= 48; c++) set(75, c, CLIFF);
+    set(75, 38, LEDGE); set(75, 39, LEDGE);
+
+    // ── Build elevMap ─────────────────────────────────────────────────────
+    const elevMap = [];
+    for (let r = 0; r < H; r++) elevMap[r] = new Array(W).fill(0);
+
+    // Starter descent: Z=2 platform including its cliff bottom row 63
+    for (let r = 53; r <= 63; r++)
+      for (let c = 113; c <= 129; c++)
+        elevMap[r][c] = 2;
+    // Starter descent: Z=1 platform including its cliff bottom row 72
+    for (let r = 64; r <= 72; r++)
+      for (let c = 109; c <= 133; c++)
+        if (elevMap[r][c] < 2) elevMap[r][c] = 1;
+
+    // Z=3 peak hill (rows 54–56, cols 131–133)
+    for (let r = 54; r <= 56; r++)
+      for (let c = 131; c <= 133; c++)
+        elevMap[r][c] = 3;
+
+    // Area A elevation 1 (surface + cliff bottom row 45)
+    for (let r = 30; r <= 45; r++)
+      for (let c = 140; c <= 165; c++)
+        elevMap[r][c] = 1;
+
+    // Area B elevation 1 (surface + cliff bottom row 35)
+    for (let r = 25; r <= 35; r++)
+      for (let c = 240; c <= 270; c++)
+        elevMap[r][c] = 1;
+    // Area B elevation 2 (surface + cliff bottom row 30)
+    for (let r = 25; r <= 30; r++)
+      for (let c = 252; c <= 262; c++)
+        elevMap[r][c] = 2;
+
+    // Area C elevation 1 (surface + cliff bottom row 75)
+    for (let r = 60; r <= 75; r++)
+      for (let c = 30; c <= 48; c++)
+        elevMap[r][c] = 1;
+
+    // Mountain tiles get elevation 2 (already impassable; visual coherence)
+    for (let r = 0; r < H; r++)
+      for (let c = 0; c < W; c++)
+        if (map[r][c] === MOUNTAIN) elevMap[r][c] = 2;
+
+    this.elevMap = elevMap;
+    window.GameState.elevMap = elevMap;
+
     // ── Render tiles ─────────────────────────────────────────────────────
     const tileKeys = [
       'tile_grass', 'tile_dirt', 'tile_water', 'tile_wall', 'tile_floor',
-      'tile_tree', 'tile_mountain', 'tile_sand', 'tile_grave_grass'
+      'tile_tree', 'tile_mountain', 'tile_sand', 'tile_grave_grass',
+      'tile_cliff', 'tile_ledge'  // indexes 9 and 10
     ];
-    const blocking = [false, false, true, true, false, true, true, false, false];
-
-    this.wallGroup  = this.physics.add.staticGroup();
-    this.waterTiles = [];
+    this.wallGroup          = this.physics.add.staticGroup();
+    this.jumpableGroup      = this.physics.add.staticGroup();
+    this.ledgeGroup         = this.physics.add.staticGroup();
+    this.elevEnemyGroup     = this.physics.add.staticGroup(); // always-on for enemy blocking
+    this.waterTiles         = [];
+    this.elevatedTileImages = [];
+    this.playerElevation    = 0;
 
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W; c++) {
         const t = map[r][c];
         const x = c * TILE + TILE/2, y = r * TILE + TILE/2;
-        const img = this.add.image(x, y, tileKeys[t]).setDepth(0);
-        if (blocking[t]) {
+        const elev = elevMap[r][c];
+        const baseDepth = elev * 2;
+        const img = this.add.image(x, y, tileKeys[t]).setDepth(baseDepth);
+        // Tint elevated walkable tiles slightly brighter/warmer to show height
+        if (elev === 1 && t !== CLIFF && t !== LEDGE && t !== WALL && t !== MOUNTAIN)
+          img.setTint(0xd8f0c0);  // Z=1: slightly lighter green
+        if (elev === 2 && t !== CLIFF && t !== LEDGE && t !== WALL && t !== MOUNTAIN)
+          img.setTint(0xf0f8d0);  // Z=2: even lighter, yellowy-green (higher = brighter)
+        if (elev === 3 && t !== CLIFF && t !== LEDGE && t !== WALL && t !== MOUNTAIN)
+          img.setTint(0xffffd0);  // Z=3: near-white yellow (peak)
+
+        if (t === CLIFF) {
+          // Cliff face — always impassable regardless of player elevation
+          img.setDepth(Math.max(baseDepth, 1));
           this.physics.add.existing(img, true);
-          img.body.setSize(TILE, TILE);
-          img.body.reset(x, y);
+          img.body.setSize(TILE, TILE); img.body.reset(x, y);
           this.wallGroup.add(img);
+          img.elevRow = r; img.elevCol = c;
+          this.elevatedTileImages.push(img);
+        } else if (t === LEDGE) {
+          // Ledge step — allows jump-up to elevated area
+          img.setDepth(Math.max(baseDepth, 1));
+          this.physics.add.existing(img, true);
+          img.body.setSize(TILE, TILE); img.body.reset(x, y);
+          this.ledgeGroup.add(img);
+          img.elevRow = r; img.elevCol = c;
+          this.elevatedTileImages.push(img);
+        } else if (t === WALL || t === MOUNTAIN) {
+          this.physics.add.existing(img, true);
+          img.body.setSize(TILE, TILE); img.body.reset(x, y);
+          this.wallGroup.add(img);
+          if (elev > 0) {
+            img.elevRow = r; img.elevCol = c;
+            this.elevatedTileImages.push(img);
+          }
+        } else if (t === TREE || t === WATER) {
+          this.physics.add.existing(img, true);
+          img.body.setSize(TILE, TILE); img.body.reset(x, y);
+          this.jumpableGroup.add(img);
+        } else if (elev > 0) {
+          // Elevated walkable tile — player body toggled per elevation; enemies blocked always
+          this.physics.add.existing(img, true);
+          img.body.setSize(TILE, TILE); img.body.reset(x, y);
+          this.wallGroup.add(img);
+          img.elevRow = r; img.elevCol = c;
+          this.elevatedTileImages.push(img);
+          // Invisible zone in elevEnemyGroup — always solid so enemies can't enter hills
+          const ez = this.add.zone(x, y, TILE, TILE);
+          this.physics.add.existing(ez, true);
+          ez.body.setSize(TILE, TILE); ez.body.reset(x, y);
+          this.elevEnemyGroup.add(ez);
         }
-        if (t === WATER) {
-          this.waterTiles.push(img);
-        }
+
+        if (t === WATER) this.waterTiles.push(img);
       }
     }
 
@@ -859,21 +1035,24 @@ class WorldScene extends Phaser.Scene {
     // Render
     const tileKeys = ['tile_grass','tile_dirt','tile_water','tile_wall','tile_floor',
                       'tile_tree','tile_mountain','tile_sand','tile_grave_grass'];
-    const blocking = [false,false,true,true,false,true,true,false,false];
-    this.wallGroup  = this.physics.add.staticGroup();
-    this.waterTiles = [];
+    this.wallGroup     = this.physics.add.staticGroup();
+    this.jumpableGroup = this.physics.add.staticGroup();
+    this.waterTiles    = [];
     for(let r=0;r<H;r++) for(let c=0;c<W;c++) {
       const t = map[r][c];
       const x = c*TILE+TILE/2, y = r*TILE+TILE/2;
       const img = this.add.image(x,y,tileKeys[t]).setDepth(0);
-      // Tint SAND tiles orange-red for lava look, WATER tile deep red
-      if(t===SAND)  img.setTint(0xff6622);
-      if(t===WATER) img.setTint(0xff2200);
+      if(t===SAND)        img.setTint(0xff6622);
+      if(t===WATER)       img.setTint(0xff2200);
       if(t===GRAVE_GRASS) img.setTint(0x554433);
-      if(blocking[t]){
+      if(t===WALL||t===MOUNTAIN){
         this.physics.add.existing(img,true);
         img.body.setSize(TILE,TILE); img.body.reset(x,y);
         this.wallGroup.add(img);
+      } else if(t===TREE||t===WATER){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.jumpableGroup.add(img);
       }
       if(t===WATER) this.waterTiles.push(img);
     }
@@ -971,23 +1150,144 @@ class WorldScene extends Phaser.Scene {
     // Render
     const tileKeys = ['tile_grass','tile_dirt','tile_water','tile_wall','tile_floor',
                       'tile_tree','tile_mountain','tile_sand','tile_grave_grass'];
-    const blocking = [false,false,true,true,false,true,true,false,false];
-    this.wallGroup  = this.physics.add.staticGroup();
-    this.waterTiles = [];
+    this.wallGroup     = this.physics.add.staticGroup();
+    this.jumpableGroup = this.physics.add.staticGroup();
+    this.waterTiles    = [];
     for(let r=0;r<H;r++) for(let c=0;c<W;c++) {
       const t = map[r][c];
       const x = c*TILE+TILE/2, y = r*TILE+TILE/2;
       const img = this.add.image(x,y,tileKeys[t]).setDepth(0);
-      // Tint tiles for snow/ice look
       if(t===GRASS)       img.setTint(0xddeeff);
       if(t===GRAVE_GRASS) img.setTint(0xeef5ff);
       if(t===WATER)       img.setTint(0x88aadd);
       if(t===DIRT)        img.setTint(0xaabbcc);
       if(t===TREE)        img.setTint(0x99bbcc);
-      if(blocking[t]){
+      if(t===WALL||t===MOUNTAIN){
         this.physics.add.existing(img,true);
         img.body.setSize(TILE,TILE); img.body.reset(x,y);
         this.wallGroup.add(img);
+      } else if(t===TREE||t===WATER){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.jumpableGroup.add(img);
+      }
+      if(t===WATER) this.waterTiles.push(img);
+    }
+    this.mapData = map;
+    window.GameState.mapData = map;
+    this.physics.world.setBounds(0,0,W*TILE,H*TILE);
+  }
+
+  // ── THUNDER PEAK MAP ──────────────────────────────────────────────────────
+
+  buildMap_thunder() {
+    const W = 160, H = 120;
+    this.mapWidth  = W;
+    this.mapHeight = H;
+    this._islandSpawnTile = { x: 80, y: 110 };
+
+    const GRASS = 0, DIRT = 1, WATER = 2, WALL = 3, FLOOR = 4,
+          TREE = 5, MOUNTAIN = 6, SAND = 7, GRAVE_GRASS = 8;
+
+    const map = [];
+    for (let r = 0; r < H; r++) map[r] = new Array(W).fill(GRAVE_GRASS);
+
+    const set = (r, c, t) => { if (r>=0&&r<H&&c>=0&&c<W) map[r][c]=t; };
+    const rect = (r0,c0,r1,c1,t) => { for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) set(r,c,t); };
+
+    // Mountain border
+    for (let r=0; r<H; r++)
+      for (let c=0; c<W; c++)
+        if (r<4||r>=H-4||c<4||c>=W-4) map[r][c]=MOUNTAIN;
+
+    // Central thunder plateau — flat stone area
+    rect(40, 40, 80, 120, FLOOR);
+    for(let r=40;r<=80;r++){set(r,40,WALL);set(r,120,WALL);}
+    for(let c=40;c<=120;c++){set(40,c,WALL);set(80,c,WALL);}
+    set(80,78,FLOOR);set(80,79,FLOOR);set(80,80,FLOOR); // south entrance
+    set(40,78,FLOOR);set(40,79,FLOOR);set(40,80,FLOOR); // north exit to peak
+
+    // Thunder Peak — northern citadel
+    rect(10, 55, 38, 105, MOUNTAIN);
+    rect(14, 59, 34, 101, WALL);
+    rect(16, 61, 32, 99, FLOOR);
+    set(38,79,FLOOR);set(38,80,FLOOR); // entrance
+
+    // Inner sanctum — boss chamber
+    rect(18, 67, 30, 93, WALL);
+    rect(20, 69, 28, 91, FLOOR);
+    set(30,79,FLOOR);set(30,80,FLOOR);
+
+    // Storm ruins — west side
+    rect(55, 10, 85, 38, WALL);
+    rect(57, 12, 83, 36, FLOOR);
+    set(55,22,FLOOR);set(55,23,FLOOR);
+    // Ruin rooms
+    rect(60,14,72,24,WALL);set(72,19,FLOOR);
+    rect(60,26,72,34,WALL);set(72,30,FLOOR);
+    rect(74,14,83,34,WALL);set(74,24,FLOOR);
+
+    // Storm exile village — south
+    const VY1=90,VY2=112,VX1=65,VX2=95;
+    rect(VY1,VX1,VY2,VX2,FLOOR);
+    for(let r=VY1;r<=VY2;r++){set(r,VX1,WALL);set(r,VX2,WALL);}
+    for(let c=VX1;c<=VX2;c++){set(VY1,c,WALL);set(VY2,c,WALL);}
+    set(VY1,79,FLOOR);set(VY1,80,FLOOR);
+    // Huts
+    rect(93,68,103,78,WALL);set(103,73,FLOOR);
+    rect(93,82,103,92,WALL);set(103,87,FLOOR);
+    rect(105,68,113,92,WALL);set(105,80,FLOOR);
+
+    // Dock — south coast
+    rect(113,70,115,90,FLOOR);
+    for(let c=70;c<=90;c++){set(113,c,WALL);set(115,c,WALL);}
+    set(114,70,WALL);
+    rect(115,78,H-4,82,DIRT);
+
+    // Storm lakes — crackling lightning water
+    rect(30,130,60,155,WATER);
+    rect(35,133,55,152,MOUNTAIN);
+    rect(90,10,110,35,WATER);
+    rect(93,13,107,32,FLOOR);
+
+    // Dirt paths
+    for(let r=81;r<90;r++){set(r,79,DIRT);set(r,80,DIRT);}
+    for(let r=83;r<90;r++){set(r,65,DIRT);set(r,66,DIRT);}
+    for(let c=90;c<130;c++){set(60,c,DIRT);set(61,c,DIRT);}
+
+    // Scattered mountain boulders
+    for(let r=5;r<H-5;r++)
+      for(let c=5;c<W-5;c++)
+        if(Math.random()<0.018) map[r][c]=MOUNTAIN;
+
+    // Storm craters (WATER tiles)
+    [[25,25],[70,145],[100,70],[45,15]].forEach(([r,c]) => {
+      for(let dr=-3;dr<=3;dr++) for(let dc=-3;dc<=3;dc++)
+        if(dr*dr+dc*dc<=9) set(r+dr,c+dc,WATER);
+    });
+
+    // Render
+    const tileKeys = ['tile_grass','tile_dirt','tile_water','tile_wall','tile_floor',
+                      'tile_tree','tile_mountain','tile_sand','tile_grave_grass'];
+    this.wallGroup     = this.physics.add.staticGroup();
+    this.jumpableGroup = this.physics.add.staticGroup();
+    this.waterTiles    = [];
+    for(let r=0;r<H;r++) for(let c=0;c<W;c++) {
+      const t = map[r][c];
+      const x = c*TILE+TILE/2, y = r*TILE+TILE/2;
+      const img = this.add.image(x,y,tileKeys[t]).setDepth(0);
+      if(t===GRAVE_GRASS) img.setTint(0x667788);
+      if(t===WATER)       img.setTint(0x334466);
+      if(t===DIRT)        img.setTint(0x556677);
+      if(t===FLOOR)       img.setTint(0x778899);
+      if(t===WALL||t===MOUNTAIN){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.wallGroup.add(img);
+      } else if(t===TREE||t===WATER){
+        this.physics.add.existing(img,true);
+        img.body.setSize(TILE,TILE); img.body.reset(x,y);
+        this.jumpableGroup.add(img);
       }
       if(t===WATER) this.waterTiles.push(img);
     }
@@ -1021,6 +1321,30 @@ class WorldScene extends Phaser.Scene {
     if (window.GBA_PLAYER) this.player.play('player_idle');
 
     this.wallCollider = this.physics.add.collider(this.player, this.wallGroup);
+    // jumpableCollider uses a process callback so disabling mid-jump is instant and reliable
+    this.jumpableCollider = this.jumpableGroup
+      ? this.physics.add.collider(
+          this.player, this.jumpableGroup,
+          null,                          // onCollide
+          () => !this.isJumping          // processCallback: return false = skip collision while jumping
+        )
+      : null;
+
+    // ledgeCollider — blocks ledge tiles unless the player is jumping up from below
+    this.ledgeCollider = this.ledgeGroup
+      ? this.physics.add.collider(
+          this.player, this.ledgeGroup,
+          null,
+          (player, tile) => {
+            // Allow pass-through when jumping AND attempting to climb elevation
+            if (this.isJumping && this._climbingLedge) return false;
+            // Allow pass-through when already at same elevation as the ledge's target
+            const tileElev = this.elevMap?.[tile.elevRow]?.[tile.elevCol] ?? 0;
+            if ((this.playerElevation || 0) >= tileElev) return false;
+            return true;
+          }
+        )
+      : null;
 
     // Jump shadow (hidden by default)
     this.jumpShadow = this.add.ellipse(0, 0, 22, 10, 0x000000, 0.45).setDepth(9).setVisible(false);
@@ -1029,6 +1353,34 @@ class WorldScene extends Phaser.Scene {
       fontSize: '10px', fontFamily: 'monospace',
       color: '#ffffff', stroke: '#000', strokeThickness: 2
     }).setDepth(11).setOrigin(0.5);
+
+    // Set initial elevation from the spawn tile's elevMap value
+    const sr = Math.floor((window.GameState.playerY || spawnY) / TILE);
+    const sc = Math.floor((window.GameState.playerX || spawnX) / TILE);
+    this.playerElevation = this.elevMap?.[sr]?.[sc] ?? 0;
+    this._rebuildElevationColliders();
+    // Sync depth immediately
+    this.player.setDepth(10 + this.playerElevation * 5);
+  }
+
+  // ─────────────────── ELEVATION ──────────────────────────────────────────
+
+  _rebuildElevationColliders() {
+    if (!this.elevatedTileImages || !this.elevMap) return;
+    const pe = this.playerElevation || 0;
+    this.elevatedTileImages.forEach(img => {
+      if (!img.body) return;
+      const tileElev = this.elevMap[img.elevRow]?.[img.elevCol] ?? 0;
+      const t = this.mapData?.[img.elevRow]?.[img.elevCol];
+      if (t === 9 /* CLIFF */ || t === 10 /* LEDGE */) {
+        img.body.enable = (pe < tileElev);
+      } else {
+        // Elevated grass: block only when player is below that elevation
+        img.body.enable = (tileElev > pe);
+      }
+      // Also update the enemy-only shadow body if it exists
+      if (img._enemyShadowBody) img._enemyShadowBody.enable = true; // always on for enemies
+    });
   }
 
   // ─────────────────── ENEMIES ────────────────────────────────────────────
@@ -1037,6 +1389,7 @@ class WorldScene extends Phaser.Scene {
     const island = window.GameState.currentIsland || 0;
     if (island === 1) { this.buildEnemies_inferno(); return; }
     if (island === 2) { this.buildEnemies_frost();   return; }
+    if (island === 3) { this.buildEnemies_thunder(); return; }
     this.buildEnemies_home();
   }
 
@@ -1133,9 +1486,15 @@ class WorldScene extends Phaser.Scene {
 
     this.physics.add.collider(this.enemyGroup, this.wallGroup);
     this.physics.add.collider(this.enemyGroup, this.enemyGroup);
+    if (this.elevEnemyGroup) this.physics.add.collider(this.enemyGroup, this.elevEnemyGroup);
 
     this.physics.add.overlap(this.player, this.enemyGroup, (player, enemy) => {
       if (this.battleCooldown || this._dialogueActive) return;
+      const deck = window.GameState.playerDeck || [];
+      if (deck.length !== 30) {
+        this.showMessage('Your deck must have exactly 30 cards! (currently: ' + deck.length + '/30)', '#ff4444');
+        return;
+      }
       this.battleCooldown = true;
       window.GameState.playerX = player.x;
       window.GameState.playerY = player.y;
@@ -1229,6 +1588,41 @@ class WorldScene extends Phaser.Scene {
     this._spawnEnemyList(spawns, TINT);
   }
 
+  // ── THUNDER PEAK ENEMIES ──────────────────────────────────────────────────
+
+  buildEnemies_thunder() {
+    this.enemyGroup = this.physics.add.group();
+    const TINT = { weak: 0xffee44, normal: 0xaadd00, hard: 0x66aaff };
+    const E = window.ENEMIES;
+    // th1=26, th2=27, th3=28, th4=29, th5=30, th6=31, th7(boss)=32
+    const th = (n) => E[25 + n] || E[9];
+
+    const spawns = [
+      // Weak — south village / plateau entrance
+      { x:  72*TILE, y: 105*TILE, ei_fn: () => th(1) },
+      { x:  88*TILE, y: 100*TILE, ei_fn: () => th(1) },
+      { x:  75*TILE, y:  95*TILE, ei_fn: () => th(2) },
+      { x:  85*TILE, y:  90*TILE, ei_fn: () => th(2) },
+      // Normal — central plateau
+      { x:  60*TILE, y:  60*TILE, ei_fn: () => th(3) },
+      { x:  80*TILE, y:  55*TILE, ei_fn: () => th(3) },
+      { x: 100*TILE, y:  60*TILE, ei_fn: () => th(4) },
+      { x:  90*TILE, y:  70*TILE, ei_fn: () => th(3) },
+      // Normal — storm ruins (west)
+      { x:  25*TILE, y:  65*TILE, ei_fn: () => th(3) },
+      { x:  30*TILE, y:  75*TILE, ei_fn: () => th(4) },
+      // Hard — citadel approach
+      { x:  70*TILE, y:  45*TILE, ei_fn: () => th(5) },
+      { x:  90*TILE, y:  42*TILE, ei_fn: () => th(5) },
+      { x:  80*TILE, y:  35*TILE, ei_fn: () => th(6) },
+      { x:  75*TILE, y:  30*TILE, ei_fn: () => th(6) },
+      // Boss — inner sanctum
+      { x:  80*TILE, y:  24*TILE, ei_fn: () => th(7), spawnId: 'boss_thunder' },
+    ];
+
+    this._spawnEnemyList(spawns, TINT);
+  }
+
   // ── Shared enemy spawn helper ─────────────────────────────────────────────
 
   _spawnEnemyList(spawns, TINT) {
@@ -1236,6 +1630,10 @@ class WorldScene extends Phaser.Scene {
       const enemyDef = sp.ei_fn ? sp.ei_fn() : window.ENEMIES[sp.ei];
       if (!enemyDef) return;
       if (sp.x >= this.mapWidth * TILE || sp.y >= this.mapHeight * TILE) return;
+      // Don't spawn on blocking tiles (wall=3, tree=5, mountain=6, water=2)
+      const tr = Math.floor(sp.y / TILE), tc = Math.floor(sp.x / TILE);
+      const tt = this.mapData?.[tr]?.[tc] ?? 0;
+      if (tt === 2 || tt === 3 || tt === 5 || tt === 6) return;
       const sprite = this.physics.add.sprite(sp.x, sp.y, enemyDef.sprite)
         .setDepth(9).setCollideWorldBounds(true);
       sprite.enemyData   = enemyDef;
@@ -1261,9 +1659,16 @@ class WorldScene extends Phaser.Scene {
 
     // Shared colliders
     this.physics.add.collider(this.enemyGroup, this.wallGroup);
+    if (this.jumpableGroup) this.physics.add.collider(this.enemyGroup, this.jumpableGroup);
+    if (this.elevEnemyGroup) this.physics.add.collider(this.enemyGroup, this.elevEnemyGroup);
     this.physics.add.collider(this.enemyGroup, this.enemyGroup);
     this.physics.add.overlap(this.player, this.enemyGroup, (player, enemy) => {
       if (this.battleCooldown || this._dialogueActive) return;
+      const deck = window.GameState.playerDeck || [];
+      if (deck.length !== 30) {
+        this.showMessage('Your deck must have exactly 30 cards! (currently: ' + deck.length + '/30)', '#ff4444');
+        return;
+      }
       this.battleCooldown = true;
       window.GameState.playerX = player.x;
       window.GameState.playerY = player.y;
@@ -1413,6 +1818,8 @@ class WorldScene extends Phaser.Scene {
     } else {
     // Home island chests
     positions = [
+      // Z=3 peak hill (right of spawn)
+      { x: 132*32+16, y: 55*32+16 },
       // Dungeon 1 corners
       { x: 192*32+16, y:  10*32+16 }, { x: 228*32+16, y:  10*32+16 },
       { x: 192*32+16, y:  40*32+16 }, { x: 228*32+16, y:  40*32+16 },
@@ -1541,12 +1948,75 @@ class WorldScene extends Phaser.Scene {
         this.npcs.forEach(n => {
           const hasActive = n.questIds.some(qid => {
             const s = window.GameState.questProgress?.[qid];
-            return s && (s.status === 'active' || s.status === 'complete');
+            if (!s) return false;
+            if (s.status === 'active' || s.status === 'complete') return true;
+            // Show ! for locked quests where prereq is now met (ready to unlock)
+            if (s.status === 'locked') {
+              const q = window.QUEST_MAP[qid];
+              return !q?.prereq ||
+                window.GameState.questProgress?.[q.prereq]?.status === 'claimed';
+            }
+            return false;
           });
           n.marker.setVisible(hasActive);
         });
       },
     });
+
+    // ── Quest HUD tracker (top-right, fixed to camera) ───────────────────
+    this._buildQuestHUD();
+  }
+
+  _buildQuestHUD() {
+    // Destroy old HUD if rebuilding
+    if (this._questHUDObjs) this._questHUDObjs.forEach(o => o.destroy());
+    this._questHUDObjs = [];
+
+    const currentIsland = window.GameState.currentIsland || 0;
+    const qs = window.GameState.questProgress || {};
+
+    // Find first active quest on this island (complete > active priority)
+    let trackedQuest = null;
+    for (const q of (window.QUESTS || [])) {
+      if ((q.island ?? 0) !== currentIsland) continue;
+      const s = qs[q.id];
+      if (!s) continue;
+      if (s.status === 'complete') { trackedQuest = q; break; }
+      if (s.status === 'active' && !trackedQuest) trackedQuest = q;
+    }
+    if (!trackedQuest) return;
+
+    const state = qs[trackedQuest.id];
+    const obj = trackedQuest.objective;
+    const needed = obj.count || 1;
+    const prog = Math.min(state.progress, needed);
+    const isComplete = state.status === 'complete';
+
+    // Fixed HUD elements (scrollFactor 0)
+    const HX = 760, HY = 14, HW = 188, HH = 42;
+    const hudBg = this.add.graphics().setScrollFactor(0).setDepth(98);
+    hudBg.fillStyle(0x0a0010, 0.85); hudBg.fillRoundedRect(HX, HY, HW, HH, 5);
+    hudBg.lineStyle(1, isComplete ? 0xffd700 : 0x443366); hudBg.strokeRoundedRect(HX, HY, HW, HH, 5);
+
+    const titleT = this.add.text(HX + 6, HY + 5, (isComplete ? '★ ' : '⚔ ') + trackedQuest.name, {
+      fontSize: '9px', fontFamily: 'monospace', fontStyle: 'bold',
+      color: isComplete ? '#ffd700' : '#ccaaff',
+    }).setScrollFactor(0).setDepth(99);
+
+    const progStr = obj.type.startsWith('kill_boss') ?
+      (prog >= 1 ? '1/1' : '0/1') : prog + '/' + needed;
+    const statusStr = isComplete ? 'Return to ' + trackedQuest.npc : progStr;
+    const subT = this.add.text(HX + 6, HY + 18, statusStr, {
+      fontSize: '8px', fontFamily: 'monospace', color: isComplete ? '#ffa844' : '#8877aa',
+    }).setScrollFactor(0).setDepth(99);
+
+    // Mini progress bar
+    const barGfx = this.add.graphics().setScrollFactor(0).setDepth(99);
+    const barW = HW - 12, barFill = isComplete ? barW : Math.round(barW * prog / needed);
+    barGfx.fillStyle(0x221133); barGfx.fillRect(HX + 6, HY + 32, barW, 4);
+    barGfx.fillStyle(isComplete ? 0xffd700 : 0x8844ff); barGfx.fillRect(HX + 6, HY + 32, barFill, 4);
+
+    this._questHUDObjs = [hudBg, titleT, subT, barGfx];
   }
 
   // ─────────────────── BLACKSMITH ─────────────────────────────────────────
@@ -1810,6 +2280,21 @@ class WorldScene extends Phaser.Scene {
       }).setDepth(11).setOrigin(0.5);
       this.harborMasterPos = { x: bx-40, y: by-10, isHomeHarbor: false };
     }
+    // Thunder Peak: dock on south coast
+    else if (island === 3) {
+      const bx = 80 * TILE + TILE/2;
+      const by = 114 * TILE + TILE/2;
+      this.boatSprite = this.add.sprite(bx, by, 'boat').setDepth(9).setScale(1.4);
+      this.tweens.add({ targets: this.boatSprite, y: by+5, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const npcSprite = this.add.sprite(bx, by-30, 'npc').setDepth(10).setScale(1.0);
+      this.tweens.add({ targets: npcSprite, y: by-36, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.add.text(bx, by-54, 'Harbor Master', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#ffee44',
+        stroke: '#000', strokeThickness: 2,
+        backgroundColor: '#00000066', padding: { x: 3, y: 1 },
+      }).setDepth(11).setOrigin(0.5);
+      this.harborMasterPos = { x: bx, y: by-30, isHomeHarbor: false };
+    }
   }
 
   // ─────────────────── ANIMALS ────────────────────────────────────────────
@@ -1853,8 +2338,9 @@ class WorldScene extends Phaser.Scene {
 
     const ARRIVAL = [
       null,
-      { name: 'INFERNO ISLAND', sub: '"The fire remembers. Do you?"', color: '#ff6622', border: 0xff4400 },
-      { name: 'FROST WASTES',   sub: '"The cold shows you what you are."', color: '#88ccff', border: 0x4488ff },
+      { name: 'INFERNO ISLAND',  sub: '"The fire remembers. Do you?"  |  Ship back: WEST coast (press F)', color: '#ff6622', border: 0xff4400 },
+      { name: 'FROST WASTES',    sub: '"The cold shows you what you are."  |  Ship back: EAST coast (press F)', color: '#88ccff', border: 0x4488ff },
+      { name: 'THUNDER PEAK',    sub: '"The storm forged you. Prove it."  |  Ship back: SOUTH coast (press F)', color: '#ffee44', border: 0xaacc00 },
     ];
     const info = ARRIVAL[island];
     if (!info) return;
@@ -2142,29 +2628,74 @@ class WorldScene extends Phaser.Scene {
 
   _doJump() {
     if (this.isJumping || this.jumpCooldown) return;
-    this.isJumping   = true;
-    this.jumpCooldown = true;
+    if (!this.jumpableGroup && !this.ledgeGroup) return;
 
-    // Show shadow at current ground position
-    this.jumpShadow.setPosition(this.player.x, this.player.y + 10).setVisible(true);
+    // ── Check for ledge tile ahead (elevation climb) ──────────────────────
+    let climbingLedge = false;
+    if (this.elevMap && this.mapData) {
+      const pe  = this.playerElevation || 0;
+      const ppx = this.player.x, ppy = this.player.y;
+      const body = this.player.body;
+      const dirs = [];
+      if (body.velocity.x > 10)  dirs.push([ 1,  0]);
+      if (body.velocity.x < -10) dirs.push([-1,  0]);
+      if (body.velocity.y > 10)  dirs.push([ 0,  1]);
+      if (body.velocity.y < -10) dirs.push([ 0, -1]);
+      // If standing still, check all four directions
+      if (dirs.length === 0) {
+        dirs.push([1,0],[-1,0],[0,1],[0,-1]);
+      }
+      const checkDist = 48;
+      for (const [dx, dy] of dirs) {
+        const tr = Math.floor((ppy + dy * checkDist) / TILE);
+        const tc = Math.floor((ppx + dx * checkDist) / TILE);
+        const tileType = this.mapData[tr]?.[tc];
+        const tileElev = this.elevMap[tr]?.[tc] ?? 0;
+        // LEDGE tile (10) at elevation pe+1 — or any tile at pe+1
+        if ((tileType === 10 || tileElev === pe + 1) && tileElev === pe + 1) {
+          climbingLedge = true;
+          break;
+        }
+      }
+    }
 
-    // Remove water colliders temporarily
-    this.wallCollider.active = false;
+    this.isJumping      = true;
+    this.jumpCooldown   = true;
+    this._climbingLedge = climbingLedge;
 
-    const baseY = this.player.y;
+    this.jumpShadow.setVisible(true);
+    this.jumpShadow.setPosition(this.player.x, this.player.y + 8);
+
+    const sc = this.player.scaleX; // always 1.5
+
+    // Visual: snappy stretch-up then land — independent of collision window
     this.tweens.add({
       targets: this.player,
-      y: baseY - 22,
-      duration: 200,
-      ease: 'Sine.easeOut',
+      scaleY: sc * 1.4,
+      duration: 150,
       yoyo: true,
+      ease: 'Sine.easeOut',
       onComplete: () => {
-        this.player.setY(baseY);
-        this.isJumping        = false;
-        this.wallCollider.active = true;
+        this.player.setScale(sc, sc);
         this.jumpShadow.setVisible(false);
-        this.time.delayedCall(600, () => { this.jumpCooldown = false; });
       }
+    });
+
+    if (climbingLedge) {
+      // Mid-jump: elevate the player so collision with upper-level tiles opens up
+      this.time.delayedCall(300, () => {
+        this.playerElevation = Math.min(3, (this.playerElevation || 0) + 1);
+        this._rebuildElevationColliders();
+        this.player.setDepth(10 + this.playerElevation * 5);
+        this.scene.get('HUDScene')?.updateHUD();
+      });
+    }
+
+    // Collision stays disabled for 600ms — enough to clear 3 tiles at 200 px/s
+    this.time.delayedCall(600, () => {
+      this.isJumping      = false;
+      this._climbingLedge = false;
+      this.time.delayedCall(250, () => { this.jumpCooldown = false; });
     });
   }
 
@@ -2391,36 +2922,88 @@ class WorldScene extends Phaser.Scene {
       if (state.status === 'active')   { activeQuest = quest; dialogueKey = 'active';   break; }
       if (state.status === 'claimed')  { activeQuest = quest; dialogueKey = 'claimed';  }
     }
+
+    // If no active/complete quest found, try to unlock a locked quest whose prereq is met
+    if (!activeQuest || dialogueKey === 'locked') {
+      for (const qid of npcObj.questIds) {
+        const quest = window.QUEST_MAP[qid];
+        const state = window.GameState.questProgress?.[qid];
+        if (!state || !quest || state.status !== 'locked') continue;
+        const prereqMet = !quest.prereq ||
+          window.GameState.questProgress?.[quest.prereq]?.status === 'claimed';
+        if (prereqMet) {
+          state.status = 'active';
+          activeQuest  = quest;
+          dialogueKey  = 'active';
+          window.saveGame?.();
+          this.showMessage('NEW QUEST: ' + quest.name, '#44ff88');
+          this._buildQuestHUD();
+          break;
+        }
+      }
+    }
+
     if (!activeQuest) {
       // Fall back to first quest
       activeQuest = window.QUEST_MAP[npcObj.questIds[0]];
     }
 
-    const text = activeQuest?.dialogue?.[dialogueKey] ?? 'Greetings, traveller.';
-    const npcName = npcObj.questIds[0] ? (window.QUEST_MAP[npcObj.questIds[0]]?.npc ?? 'NPC') : 'NPC';
+    // ── Reward claiming: when quest is 'complete', give reward on dialogue open ──
+    if (dialogueKey === 'complete' && activeQuest) {
+      window.GameState.playerMoney = (window.GameState.playerMoney || 0) + (activeQuest.reward?.gold || 0);
+      if (activeQuest.reward?.card) {
+        window.GameState.playerCollection = window.GameState.playerCollection || [];
+        window.GameState.playerCollection.push(activeQuest.reward.card);
+      }
+      window.GameState.questProgress[activeQuest.id].status = 'claimed';
+      window.saveGame?.();
+      this._buildQuestHUD?.();
+      this.scene.get('HUDScene')?.updateHUD();
+      // Unlock any quests whose prereq is now satisfied (player must still talk to that NPC)
+      (window.QUESTS || []).forEach(q => {
+        if (q.prereq === activeQuest.id) {
+          const s = window.GameState.questProgress?.[q.id];
+          if (s && s.status === 'locked') {
+            // Refresh markers only — player must walk to that NPC to activate
+            this._buildQuestHUD?.();
+          }
+        }
+      });
+    }
 
-    // Show dialogue box
-    const cx = this.cameras.main.scrollX + 480;
-    const cy = this.cameras.main.scrollY + 500;
-    const W = 700, H = 90;
+    let text = activeQuest?.dialogue?.[dialogueKey] ?? 'Greetings, traveller.';
+    // When claiming, append reward info to dialogue
+    if (dialogueKey === 'complete' && activeQuest?.reward) {
+      const rewardParts = [];
+      if (activeQuest.reward.gold) rewardParts.push('+' + activeQuest.reward.gold + 'G');
+      if (activeQuest.reward.card && window.CARD_MAP?.[activeQuest.reward.card])
+        rewardParts.push('+' + window.CARD_MAP[activeQuest.reward.card].name);
+      if (rewardParts.length) text += '\n[Reward received: ' + rewardParts.join(', ') + ']';
+    }
+    const npcName = activeQuest?.npc ?? (npcObj.questIds[0] ? (window.QUEST_MAP[npcObj.questIds[0]]?.npc ?? 'NPC') : 'NPC');
 
-    const bg   = this.add.graphics().setDepth(300);
-    bg.fillStyle(0x0a0018, 0.94); bg.fillRoundedRect(cx - W/2, cy - H/2, W, H, 8);
-    bg.lineStyle(2, 0x8844cc);    bg.strokeRoundedRect(cx - W/2, cy - H/2, W, H, 8);
+    // Dialogue box fixed to camera (screen space)
+    const W = 700, H = 100;
+    const SX = 480, SY = 510; // screen center-x, near-bottom
+    const borderCol = dialogueKey === 'complete' ? 0xffd700 : 0x8844cc;
 
-    const nameT = this.add.text(cx - W/2 + 14, cy - H/2 + 8, npcName, {
+    const bg = this.add.graphics().setScrollFactor(0).setDepth(300);
+    bg.fillStyle(0x0a0018, 0.94); bg.fillRoundedRect(SX - W/2, SY - H/2, W, H, 8);
+    bg.lineStyle(2, borderCol);   bg.strokeRoundedRect(SX - W/2, SY - H/2, W, H, 8);
+
+    const nameT = this.add.text(SX - W/2 + 14, SY - H/2 + 8, npcName, {
       fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#cc88ff',
       stroke: '#000', strokeThickness: 2,
-    }).setDepth(301);
+    }).setScrollFactor(0).setDepth(301);
 
-    const bodyT = this.add.text(cx - W/2 + 14, cy - H/2 + 28, text, {
-      fontSize: '12px', fontFamily: 'monospace', color: '#ddddee',
+    const bodyT = this.add.text(SX - W/2 + 14, SY - H/2 + 28, text, {
+      fontSize: '11px', fontFamily: 'monospace', color: '#ddddee',
       wordWrap: { width: W - 28 },
-    }).setDepth(301);
+    }).setScrollFactor(0).setDepth(301);
 
-    const hint = this.add.text(cx + W/2 - 10, cy + H/2 - 8, '[F] close', {
+    const hint = this.add.text(SX + W/2 - 10, SY + H/2 - 8, '[F] close', {
       fontSize: '9px', fontFamily: 'monospace', color: '#555566',
-    }).setDepth(301).setOrigin(1, 1);
+    }).setScrollFactor(0).setDepth(301).setOrigin(1, 1);
 
     const close = () => {
       [bg, nameT, bodyT, hint].forEach(o => o.destroy());
@@ -2463,7 +3046,6 @@ class WorldScene extends Phaser.Scene {
     } else {
       const card = chest.rareCards[Math.floor(Math.random() * chest.rareCards.length)];
       window.GameState.playerCollection.push(card);
-      if (window.GameState.playerDeck.length < 40) window.GameState.playerDeck.push(card);
       const cardName = (window.CARD_MAP && window.CARD_MAP[card]) ? window.CARD_MAP[card].name : card;
       msg = 'TREASURE!  Found: ' + cardName + '!';
     }
@@ -2541,6 +3123,29 @@ class WorldScene extends Phaser.Scene {
     this.showMessage('Dismounted', '#aaaaaa');
   }
 
+  // ─────────────────── FIELD OF VIEW ──────────────────────────────────────
+
+  _initFoV() {
+    // FoV disabled — was causing visual artifacts on open terrain
+    this._fovCanvas = null;
+    this._fovImage  = null;
+    this._fovTimer  = 0;
+  }
+
+  _castRayDist(angle, maxDist) {
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    const px = this.player.x, py = this.player.y;
+    for (let d = 10; d < maxDist; d += 10) {
+      const tr = Math.floor((py + dy * d) / 32);
+      const tc = Math.floor((px + dx * d) / 32);
+      const t  = this.mapData?.[tr]?.[tc] ?? 0;
+      if (t === 3 || t === 5 || t === 6) return d; // wall, tree, mountain block sight
+    }
+    return maxDist;
+  }
+
+  _updateFoV() { /* FoV disabled */ }
+
   // ─────────────────── WEATHER ────────────────────────────────────────────
 
   _updateWeather(delta) {
@@ -2579,11 +3184,11 @@ class WorldScene extends Phaser.Scene {
     const W = 960, H = 640;
     const COUNT = weatherType === 'rain' ? 40 : 25;
 
+    const spd = weatherType === 'rain' ? 0.28 : weatherType === 'snow' ? 0.10 : 0.06;
     for (let k = 0; k < COUNT; k++) {
-      const t = (time * 0.001 + k * 0.7) % 1.0;
       const seed = k * 137.5 + 1;
       const bx = ((seed * 0.7) % 1.0) * W;
-      const by = (t * H * 1.4) % H;
+      const by = (time * spd + k * (H / COUNT)) % H;
 
       switch (weatherType) {
         case 'rain':
@@ -2592,11 +3197,11 @@ class WorldScene extends Phaser.Scene {
           break;
         case 'snow':
           gfx.fillStyle(0xeef5ff, 0.9);
-          gfx.fillRect(Math.floor(bx + Math.sin(t*10+k)*6), Math.floor(by), 2, 2);
+          gfx.fillRect(Math.floor(bx + Math.sin(time * 0.002 + k * 2.1) * 6), Math.floor(by), 2, 2);
           break;
         case 'ash':
           gfx.fillStyle(0x886655, 0.7);
-          gfx.fillRect(Math.floor(bx + Math.sin(t*8+k)*8), Math.floor(by), 2, 2);
+          gfx.fillRect(Math.floor(bx + Math.sin(time * 0.0015 + k * 1.8) * 8), Math.floor(by), 2, 2);
           break;
         case 'sand':
           gfx.fillStyle(0xcc9944, 0.5);
@@ -2610,6 +3215,7 @@ class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     this._updateWeather(delta);
+    this._updateFoV();
     const baseSpeed   = 200;
     const mountSpeed  = 600;
     const speed       = this.mountedHorse ? mountSpeed : baseSpeed;
@@ -2636,9 +3242,11 @@ class WorldScene extends Phaser.Scene {
         const cur = this.player.anims.currentAnim?.key;
         if (cur !== 'player_idle') this.player.play('player_idle');
       } else if (Math.abs(vy) >= Math.abs(vx)) {
+        this.player.setFlipX(false);
         this.player.play(vy < 0 ? 'player_walk_up' : 'player_walk_down', true);
       } else {
-        this.player.play(vx < 0 ? 'player_walk_left' : 'player_walk_right', true);
+        if (vx < 0) { this.player.setFlipX(true);  this.player.play('player_walk_left',  true); }
+        else         { this.player.setFlipX(false); this.player.play('player_walk_right', true); }
       }
     } else {
       if (vx < 0) this.player.setFlipX(true);
@@ -2720,6 +3328,28 @@ class WorldScene extends Phaser.Scene {
       });
     }
 
+    // ── Player depth by elevation ─────────────────────────────────────────
+    this.player.setDepth(10 + (this.playerElevation || 0) * 5);
+
+    // ── Auto-drop when walking off elevated edge ──────────────────────────
+    if ((this.playerElevation || 0) > 0 && !this.isJumping) {
+      const pr2 = Math.floor(this.player.y / TILE);
+      const pc2 = Math.floor(this.player.x / TILE);
+      const curElev = this.elevMap?.[pr2]?.[pc2] ?? 0;
+      if (curElev < (this.playerElevation || 0)) {
+        this.playerElevation = curElev;
+        this._rebuildElevationColliders();
+        this.scene.get('HUDScene')?.updateHUD();
+        // Squash landing visual
+        const sc = this.player.scaleX;
+        this.tweens.add({
+          targets: this.player,
+          scaleY: sc * 0.7,
+          duration: 100, yoyo: true, ease: 'Bounce.easeOut',
+        });
+      }
+    }
+
     // ── Explored tiles update ─────────────────────────────────────────────
     const pr = Math.floor(this.player.y / TILE);
     const pc = Math.floor(this.player.x / TILE);
@@ -2734,6 +3364,54 @@ class WorldScene extends Phaser.Scene {
   }
 
   // ─────────────────── UTILS ──────────────────────────────────────────────
+
+  _showLevelUpEffect(lv, heartGained) {
+  const cx = this.cameras.main.scrollX + 480;
+  const cy = this.cameras.main.scrollY + 320;
+
+  // Gold screen flash
+  const flash = this.add.rectangle(cx, cy, 960, 640,
+    heartGained ? 0xff66aa : 0xffd700, 0.45).setDepth(105).setScrollFactor(0);
+  this.tweens.add({ targets: flash, alpha: 0, duration: 600, ease: 'Power2', onComplete: () => flash.destroy() });
+
+  // Big LEVEL UP text
+  const col  = heartGained ? '#ff99cc' : '#ffd700';
+  const msg  = heartGained ? 'LEVEL ' + lv + '!\n+1 MAX HEART ♥' : 'LEVEL UP!\nLv.' + lv + '  (+HP)';
+  const t = this.add.text(cx, cy - 40, msg, {
+    fontSize: '34px', fontFamily: 'monospace', fontStyle: 'bold',
+    color: col, stroke: '#000', strokeThickness: 5, align: 'center'
+  }).setOrigin(0.5).setDepth(106).setScrollFactor(0).setAlpha(0).setScale(0.5);
+  this.tweens.add({
+    targets: t, alpha: 1, scaleX: 1, scaleY: 1,
+    duration: 280, ease: 'Back.easeOut',
+    onComplete: () => {
+      this.time.delayedCall(1200, () => {
+        this.tweens.add({ targets: t, y: t.y - 60, alpha: 0, duration: 800, ease: 'Power2', onComplete: () => t.destroy() });
+      });
+    }
+  });
+
+  // Pixel burst around player
+  const burstCol = heartGained ? 0xff66aa : 0xffd700;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const dist = 50 + Math.floor(Math.random() * 40);
+    const g = this.add.graphics().setDepth(105).setScrollFactor(0);
+    g.fillStyle(burstCol, 1);
+    g.fillRect(-3, -3, 6, 6);
+    g.x = cx; g.y = cy;
+    this.tweens.add({
+      targets: g,
+      x: cx + Math.cos(a) * dist,
+      y: cy + Math.sin(a) * dist,
+      alpha: 0,
+      duration: 500, ease: 'Power2',
+      onComplete: () => g.destroy()
+    });
+  }
+
+  this.cameras.main.shake(200, 0.003);
+}
 
   showMessage(text, color = '#ffffff') {
     const t = this.add.text(

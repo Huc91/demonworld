@@ -25,9 +25,27 @@ class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
 
     // ── Close hint ────────────────────────────────────────────────────
-    this.add.text(900, 36, '[ESC]', {
+    this.add.text(900, 36, '[ESC / M: close]', {
       fontSize: '12px', fontFamily: 'monospace', color: '#666666'
     }).setOrigin(1, 0);
+
+    // ── Save button ───────────────────────────────────────────────────
+    const saveBtn = this.add.text(36, 36, '💾 SAVE', {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold',
+      backgroundColor: '#0a2a0a', padding: { x: 10, y: 6 },
+      color: '#44bb44', stroke: '#000', strokeThickness: 2
+    }).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    saveBtn.on('pointerover', () => saveBtn.setStyle({ backgroundColor: '#164416' }));
+    saveBtn.on('pointerout',  () => saveBtn.setStyle({ backgroundColor: '#0a2a0a' }));
+    saveBtn.on('pointerdown', () => {
+      window.saveGame();
+      saveBtn.setText('💾 SAVED!');
+      saveBtn.setStyle({ color: '#aaffaa' });
+      this.time.delayedCall(1500, () => {
+        saveBtn.setText('💾 SAVE');
+        saveBtn.setStyle({ color: '#44bb44' });
+      });
+    });
 
     this.input.keyboard.on('keydown-ESC', () => this.closeMenu());
     this.input.keyboard.on('keydown-M',   () => this.closeMenu());
@@ -281,6 +299,32 @@ class MenuScene extends Phaser.Scene {
 
       this.drawMiniCard(card, counts[card.id], cx, cy, CW, CH, container);
 
+      // Add-to-deck button (bottom of card)
+      const deckCounts2 = {};
+      window.GameState.playerDeck.forEach(id => { deckCounts2[id] = (deckCounts2[id] || 0) + 1; });
+      const inDeckNow = deckCounts2[card.id] || 0;
+      const ownedNow  = counts[card.id] || 0;
+      const canAddNow = inDeckNow < ownedNow && window.GameState.playerDeck.length < 30;
+      const addBg = this.add.graphics();
+      addBg.fillStyle(canAddNow ? 0x0a2a0a : 0x111111);
+      addBg.fillRect(cx - CW/2, cy + CH/2 - 14, CW, 14);
+      container.add(addBg);
+      const addBtn = this.add.text(cx, cy + CH/2 - 7,
+        canAddNow ? '+ ADD TO DECK' : (inDeckNow >= ownedNow ? 'MAX COPIES' : 'DECK FULL'), {
+        fontSize: '7px', fontFamily: 'monospace', fontStyle: 'bold',
+        color: canAddNow ? '#44cc44' : '#444444'
+      }).setOrigin(0.5).setInteractive({ useHandCursor: canAddNow });
+      if (canAddNow) {
+        addBtn.on('pointerover', () => { addBg.clear(); addBg.fillStyle(0x1a4a1a); addBg.fillRect(cx - CW/2, cy + CH/2 - 14, CW, 14); });
+        addBtn.on('pointerout',  () => { addBg.clear(); addBg.fillStyle(0x0a2a0a); addBg.fillRect(cx - CW/2, cy + CH/2 - 14, CW, 14); });
+        addBtn.on('pointerdown', () => {
+          if (window.GameState.playerDeck.length >= 30) { this.flashMsg('Deck full! (30/30)', '#ff4444'); return; }
+          window.GameState.playerDeck.push(card.id);
+          this.clearContent(); this.buildCollection();
+        });
+      }
+      container.add(addBtn);
+
       // Sell button: only for duplicates (keep at least 1 copy)
       const sellCount = counts[card.id];
       if (sellCount > 1) {
@@ -399,9 +443,17 @@ class MenuScene extends Phaser.Scene {
     const deckSize = deckIds.length;
 
     // ── Deck side (right) ──
-    this._contentObjs.push(this.add.text(740, 112, 'YOUR DECK  (' + deckSize + '/30)', {
-      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#aaffaa'
+    const deckHeaderColor = deckSize < 30 ? '#ffaa44' : deckSize === 30 ? '#aaffaa' : '#ff4444';
+    const deckHeaderLabel = deckSize < 30 ? 'YOUR DECK  (' + deckSize + '/30) ⚠' :
+                            deckSize === 30 ? 'YOUR DECK  (30/30) ✓' : 'YOUR DECK  (' + deckSize + '/30) ✗';
+    this._contentObjs.push(this.add.text(740, 112, deckHeaderLabel, {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: deckHeaderColor
     }).setOrigin(0.5, 0));
+    if (deckSize !== 30) {
+      this._contentObjs.push(this.add.text(740, 128, deckSize < 30 ? 'Need exactly 30 cards to battle' : 'Remove ' + (deckSize - 30) + ' card(s)', {
+        fontSize: '9px', fontFamily: 'monospace', color: '#ff7733'
+      }).setOrigin(0.5, 0));
+    }
 
     const deckUnique = Object.keys(deckCounts).map(id => window.CARD_MAP[id]).filter(Boolean);
     deckUnique.sort((a,b) => a.cost - b.cost);
@@ -503,6 +555,27 @@ class MenuScene extends Phaser.Scene {
       container.add(this.add.text(cx, cy + CH/2 - 4, inDeck + '/' + owned, {
         fontSize: '7px', fontFamily: 'monospace', color: canAdd ? '#44aa44' : '#555555'
       }).setOrigin(0.5, 1));
+
+      // Status tag
+      if (inDeck >= owned && inDeck > 0) {
+        const tagBg = this.add.graphics();
+        tagBg.fillStyle(0x002200, 1); tagBg.fillRoundedRect(cx - 28, cy - CH/2 + 1, 56, 10, 2);
+        container.add(tagBg);
+        container.add(this.add.text(cx, cy - CH/2 + 6, 'MAX COPIES', {
+          fontSize: '6px', fontFamily: 'monospace', fontStyle: 'bold', color: '#44ff44'
+        }).setOrigin(0.5));
+      } else if (deckSize >= 30) {
+        const tagBg = this.add.graphics();
+        tagBg.fillStyle(0x220000, 1); tagBg.fillRoundedRect(cx - 28, cy - CH/2 + 1, 56, 10, 2);
+        container.add(tagBg);
+        container.add(this.add.text(cx, cy - CH/2 + 6, 'DECK FULL', {
+          fontSize: '6px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ff6644'
+        }).setOrigin(0.5));
+      } else if (inDeck > 0) {
+        container.add(this.add.text(cx + CW/2 - 3, cy - CH/2 + 3, '×' + inDeck, {
+          fontSize: '7px', fontFamily: 'monospace', fontStyle: 'bold', color: '#55dd55'
+        }).setOrigin(1, 0));
+      }
 
       const zone = this.add.zone(cx, cy, CW, CH).setInteractive({ useHandCursor: canAdd });
       if (canAdd) zone.on('pointerdown', () => this.addToDeck(card.id));
@@ -1076,9 +1149,17 @@ class MenuScene extends Phaser.Scene {
     bg.fillStyle(0x8844ff); bg.fillRoundedRect(480 - barW/2, 162, Math.round(barW * doneQ / totalQ), barH, 4);
     this._contentObjs.push(bg);
 
-    // Quest list
+    // Count undiscovered quests (still locked)
+    const lockedCount = window.QUESTS.filter(q => (qs[q.id]?.status || 'locked') === 'locked').length;
+
+    // Quest list — only show discovered (active/complete/claimed) quests
     let y = 192;
-    window.QUESTS.forEach(quest => {
+    const visibleQuests = window.QUESTS.filter(q => {
+      const s = qs[q.id]?.status || 'locked';
+      return s !== 'locked';
+    });
+
+    visibleQuests.forEach(quest => {
       const state = qs[quest.id] || { status: 'locked', progress: 0 };
       const col   = statusColor[state.status] || '#444444';
       const label = statusLabel[state.status]  || '?';
@@ -1154,6 +1235,16 @@ class MenuScene extends Phaser.Scene {
 
       y += 74;
     });
+
+    if (visibleQuests.length === 0) {
+      this._contentObjs.push(this.add.text(480, 300, 'No quests discovered yet.\nTalk to NPCs in the world to unlock quests.', {
+        fontSize: '14px', fontFamily: 'monospace', color: '#554466', align: 'center',
+      }).setOrigin(0.5));
+    } else if (lockedCount > 0) {
+      this._contentObjs.push(this.add.text(480, y + 10, '+ ' + lockedCount + ' undiscovered quest' + (lockedCount > 1 ? 's' : '') + ' — talk to NPCs to find them', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#443355', align: 'center',
+      }).setOrigin(0.5, 0));
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -1328,7 +1419,7 @@ class MenuScene extends Phaser.Scene {
     const lv  = gs.playerLevel  || 1;
     const xp  = gs.playerXP     || 0;
     const xpN = lv * 50;
-    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes'];
+    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes', 'Thunder Peak'];
 
     const rows = [
       ['Player Level',         'Lv.' + lv + '  [' + xp + ' / ' + xpN + ' XP]',             '#ffd700'],

@@ -7,6 +7,24 @@ class PreloadScene extends Phaser.Scene {
       'resources/pk_tileset/Game%20Boy%20Advance%20-%20Pokemon%20FireRed%20_%20LeafGreen%20-%20Tilesets%20-%20Tileset%202.png');
     this.load.image('mw_walls',
       'resources/mystic_woods_free_2.2/sprites/tilesets/walls/walls.png');
+    this.load.image('mw_grass',
+      'resources/mystic_woods_free_2.2/sprites/tilesets/grass.png');
+    this.load.image('mw_plains',
+      'resources/mystic_woods_free_2.2/sprites/tilesets/plains.png');
+    this.load.image('mw_decor',
+      'resources/mystic_woods_free_2.2/sprites/tilesets/decor_16x16.png');
+    this.load.image('mw_chest',
+      'resources/mystic_woods_free_2.2/sprites/objects/chest_01.png');
+    // Mystic Woods characters (48×48 frames)
+    this.load.spritesheet('mw_player',
+      'resources/mystic_woods_free_2.2/sprites/characters/player.png',
+      { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('mw_skeleton',
+      'resources/mystic_woods_free_2.2/sprites/characters/skeleton.png',
+      { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('mw_slime',
+      'resources/mystic_woods_free_2.2/sprites/characters/slime.png',
+      { frameWidth: 48, frameHeight: 48 });
     for (let i = 1; i <= 10; i++) {
       this.load.spritesheet('char_' + i,
         'resources/character-pack-full_version/sprite_split/character_' + i +
@@ -51,6 +69,88 @@ class PreloadScene extends Phaser.Scene {
     MONSTY['demon_023'] = 'NB_22'; // Baphomet — blue octopus with horns dark
     MONSTY['demon_029'] = 'NB_11'; // Warlord  — armored shell beast
 
+    // ── Extended demon set (demon_031–105) ───────────────────────────────
+    // Osiris parts (legendary gold forms)
+    MONSTY['demon_031'] = 'NB_28'; MONSTY['demon_032'] = 'NB_21';
+    MONSTY['demon_033'] = 'NB_19'; MONSTY['demon_034'] = 'NB_20';
+    MONSTY['demon_035'] = 'NB_27';
+    // Shop / boss / special cards
+    MONSTY['demon_036'] = 'NB_29'; // Tactician
+    MONSTY['demon_037'] = 'NB_11'; // Mind Bender
+    MONSTY['demon_038'] = 'NB_16'; // Sniper Fiend
+    MONSTY['demon_039'] = 'NB_21'; // Hollow Mirror
+    MONSTY['demon_040'] = 'NB_13'; // Imp Matron
+    MONSTY['demon_041'] = 'NB_22'; // Equalizer
+    MONSTY['demon_042'] = 'NB_30'; // Arch Demon
+    MONSTY['demon_043'] = 'NB_01'; // Demon Overlord
+    MONSTY['demon_044'] = 'NB_12'; // Chaos King Dragon
+    MONSTY['demon_045'] = 'NB_16'; // Twin Fury
+    // Dark subtype
+    MONSTY['demon_046'] = 'NB_06'; // Grave Glutton
+    MONSTY['demon_047'] = 'NB_07'; // Carrion Beetle
+    MONSTY['demon_048'] = 'NB_05'; // Echo Scholar
+    MONSTY['demon_049'] = 'NB_04'; // Shadow Raider
+    MONSTY['demon_050'] = 'NB_08'; // Soul Collector
+    MONSTY['demon_051'] = 'NB_10'; // Necrotic Wisp
+    MONSTY['demon_052'] = 'NB_13'; // Blood Cultist
+    MONSTY['demon_053'] = 'NB_15'; // Night Stalker
+    MONSTY['demon_054'] = 'NB_08'; // Lich's Familiar
+    MONSTY['demon_055'] = 'NB_03'; // Plague Bearer
+    MONSTY['demon_056'] = 'NB_16'; // Specter Assassin
+    MONSTY['demon_057'] = 'NB_22'; // Mind Shredder
+    MONSTY['demon_058'] = 'NB_04'; // Dusk Predator
+    MONSTY['demon_059'] = 'NB_26'; // Undying Fiend
+    MONSTY['demon_060'] = 'NB_10'; // Larcenous Shade
+    // Light subtype
+    MONSTY['demon_061'] = 'NB_11'; // Iron Warden
+    MONSTY['demon_062'] = 'NB_20'; // Celestial Healer
+    MONSTY['demon_063'] = 'NB_12'; // Thunder Drake
+    MONSTY['demon_064'] = 'NB_29'; // Radiant Sentinel
+    MONSTY['demon_065'] = 'NB_05'; // Star Prophet
+    MONSTY['demon_066'] = 'NB_29'; // Holy Knight
+    MONSTY['demon_067'] = 'NB_21'; // Lightning Herald
+    MONSTY['demon_068'] = 'NB_19'; // Gleaming Drake
+    MONSTY['demon_069'] = 'NB_28'; // Angelic Guardian
+    MONSTY['demon_070'] = 'NB_24'; // Seraph
+    // Fire subtype
+    MONSTY['demon_071'] = 'NB_13'; // Ember Thief
+    MONSTY['demon_072'] = 'NB_13'; // Blaze Imp
+    MONSTY['demon_073'] = 'NB_02'; // Lava Golem
+    MONSTY['demon_074'] = 'NB_12'; // Infernal Drake
+    MONSTY['demon_075'] = 'NB_26'; // Pyromancer
+    MONSTY['demon_076'] = 'NB_01'; // Magma Titan
+    MONSTY['demon_077'] = 'NB_13'; // Hellfire Imp
+    MONSTY['demon_078'] = 'NB_05'; // Cinder Scholar
+    MONSTY['demon_079'] = 'NB_30'; // Phoenix
+    MONSTY['demon_080'] = 'NB_09'; // Lava Drake
+    MONSTY['demon_081'] = 'NB_26'; // Fire Elemental
+    MONSTY['demon_082'] = 'NB_01'; // Molten Giant
+    // Water subtype
+    MONSTY['demon_083'] = 'NB_07'; // Tidal Terror
+    MONSTY['demon_084'] = 'NB_20'; // Frost Mage
+    MONSTY['demon_085'] = 'NB_29'; // Ice Barrier
+    MONSTY['demon_086'] = 'NB_07'; // Sea Serpent
+    MONSTY['demon_087'] = 'NB_06'; // Arcane Leech
+    MONSTY['demon_088'] = 'NB_19'; // Glacial Colossus
+    MONSTY['demon_089'] = 'NB_05'; // River Sprite
+    MONSTY['demon_090'] = 'NB_21'; // Storm Surge
+    MONSTY['demon_091'] = 'NB_22'; // Kraken Spawn
+    MONSTY['demon_092'] = 'NB_15'; // Deep Lurker
+    // Beast subtype
+    MONSTY['demon_093'] = 'NB_24'; // Mana Dryad
+    MONSTY['demon_094'] = 'NB_03'; // Elder Treant
+    MONSTY['demon_095'] = 'NB_01'; // Stampeding Bull
+    MONSTY['demon_096'] = 'NB_07'; // Giant Spider
+    MONSTY['demon_097'] = 'NB_04'; // Sabertooth
+    MONSTY['demon_098'] = 'NB_02'; // Pack Alpha
+    MONSTY['demon_099'] = 'NB_01'; // Thunderous Rex
+    MONSTY['demon_100'] = 'NB_12'; // Elder Dragon
+    MONSTY['demon_101'] = 'NB_04'; // Dire Wolf
+    MONSTY['demon_102'] = 'NB_11'; // Ancient Tortoise
+    MONSTY['demon_103'] = 'NB_12'; // Primal Dragon
+    MONSTY['demon_104'] = 'NB_01'; // Forest Colossus
+    MONSTY['demon_105'] = 'NB_03'; // Nest Warden
+
     // ── Inferno Island demons (demon_106–111) ─────────────────────────────
     MONSTY['demon_106'] = 'NB_13'; // Lava Imp         — red spiky demon
     MONSTY['demon_107'] = 'NB_09'; // Cinder Hound     — orange scorpion fire beast
@@ -66,6 +166,14 @@ class PreloadScene extends Phaser.Scene {
     MONSTY['demon_115'] = 'NB_08'; // Frost Wraith     — purple ghost wraith
     MONSTY['demon_116'] = 'NB_29'; // Permafrost Titan — massive white titan
     MONSTY['demon_117'] = 'NB_20'; // Glacial Sovereign — white/blue ice form
+
+    // ── Thunder Peak demons (demon_118–123) ───────────────────────────────
+    MONSTY['demon_118'] = 'NB_13'; // Spark Imp        — red spiky demon
+    MONSTY['demon_119'] = 'NB_09'; // Storm Hound      — orange scorpion
+    MONSTY['demon_120'] = 'NB_02'; // Tempest Knight   — gray armored golem
+    MONSTY['demon_121'] = 'NB_12'; // Thunder Drake    — gold dragon
+    MONSTY['demon_122'] = 'NB_26'; // Stormcaller      — red/orange fire blob
+    MONSTY['demon_123'] = 'NB_30'; // Thunder Sovereign — red/gold lion
 
     Object.entries(MONSTY).forEach(([cardId, file]) => {
       this.load.image('card_art_' + cardId, 'resources/monsty/' + file + '.png');
@@ -92,13 +200,15 @@ class PreloadScene extends Phaser.Scene {
   }
 
   create() {
-    // Strip white backgrounds from monsty images (base set + island demons)
-    for (let i = 1; i <= 30; i++) {
-      this._stripWhiteBg('card_art_demon_' + String(i).padStart(3, '0'));
-    }
-    for (let i = 106; i <= 117; i++) {
-      this._stripWhiteBg('card_art_demon_' + String(i).padStart(3, '0'));
-    }
+    // Strip white backgrounds from monsty images (all demon card arts)
+    const stripRanges = [
+      [1, 30], [31, 105], [106, 123]
+    ];
+    stripRanges.forEach(([a, b]) => {
+      for (let i = a; i <= b; i++) {
+        this._stripWhiteBg('card_art_demon_' + String(i).padStart(3, '0'));
+      }
+    });
 
     this.makeTiles();
     this.makePlayer();
@@ -135,25 +245,25 @@ class PreloadScene extends Phaser.Scene {
   // ── TILES ─────────────────────────────────────────────────────────────
 
   makeTiles() {
-    // SNES Zelda-style grass with subtle flower accents and varied shading
+    // GBA FireRed/Emerald-style grass — base green with darker patches and bright highlights
     this.px('tile_grass', [
-      'GGgGGGGGGlGGGGGG',
-      'GGGGGGGgGGGGGGGG',
-      'GlGGGGGGGGGGgGGG',
-      'GGGGgGGGGGGGGGGG',
-      'GGGGGGGGGGlGGGGg',
-      'GGGGGGgGGGGGGGGG',
-      'GGGGGGGGGGGGGGGl',
-      'gGGGGGGGGGgGGGGG',
-      'GGGGlGGGGGGGGGGG',
-      'GGGGGGGGgGGGGGGG',
-      'GGGGGGGGGGGGlGGG',
-      'GGGgGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGgG',
-      'GGGGGlGGGgGGGGGG',
-      'GGGGGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGGg',
-    ], { G: '#3A9228', g: '#1E6010', l: '#5AB840', f: '#F0E870' });
+      'BBhBBBBBBBBBhBBB',
+      'BBBBBhBBBBBBBBBB',
+      'BhBBBBBBBBBBBBhB',
+      'BBBhBBBBBhBBBBBB',
+      'BBBBBBBBBBBBhBBB',
+      'hBBBBBBhBBBBBBBB',
+      'BBBBBBBBBBBBBBBh',
+      'BBBBhBBBBBBhBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBhBBBBBBBB',
+      'hBBBBBBBBBBBBhBB',
+      'BBBBBhBBBBBBBBBB',
+      'BBhBBBBBBBBBBBBh',
+      'BBBBBBBBhBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBhBBBBhBBB',
+    ], { B: '#58a832', h: '#72c840', s: '#3a8020', d: '#286018' });
 
     // SNES Zelda dirt path with pebble texture
     this.px('tile_dirt', [
@@ -173,47 +283,47 @@ class PreloadScene extends Phaser.Scene {
       'FFFFFFFFFfFFFFFF',
       'FFFFFFFFFFFFfFFF',
       'FFFFFfFFFFFFFFFf',
-    ], { F: '#C8964A', f: '#A87030', L: '#E0B870' });
+    ], { F: '#c87820', f: '#9a5810', L: '#E0B870' });
 
-    // SNES water with classic ripple wave pattern
+    // GBA-style deep water with wave streaks and foam flecks
     this.px('tile_water', [
-      'WWwWWWWWWWWWWWWW',
-      'WwwwwWWWWWWWWWWW',
-      'wwwLwwwWWWWWWWwW',
-      'wwLLLwwwWWWWWwww',
-      'wwwLwwwwwwwwwwww',
-      'Wwwwwwwwwwwwwwww',
-      'WWwwwwwwwwwwwwww',
-      'WWWwWWwwwwwwwwwW',
-      'WWWWWWwwwwWWWWWW',
-      'WWWWWWWwwwWWWWWW',
-      'WWWWWwwwwwWWWWWW',
-      'WWWWwwwwwwwWWWWW',
-      'WWwwwwLwwwwwwWWW',
-      'Wwwwwwwwwwwwwwww',
-      'wwwwwwwwwwwwwwww',
-      'WWwwwwwwwwwwwwwW',
-    ], { W: '#1848B8', w: '#0828A0', L: '#6098F0', f: '#C0E0FF' });
+      'DDdDDDDDDDDDDDDD',
+      'DdddwDDDDDDDDDDD',
+      'dddwwddDDDDDDdDD',
+      'ddwwwdddDDDDDddd',
+      'dddwdddddddddddd',
+      'DDdddddddddddDDD',
+      'DDDdddddddddDDDD',
+      'DDDDDdddddddDDDD',
+      'DDDDDDdddDDDDDDD',
+      'DDDDDDDddDDDDDDD',
+      'DDDDDdddddDDDDDD',
+      'DDDDdddddddDDDDD',
+      'DDddddFdddddddDD',
+      'Dddddddddddddddd',
+      'ddddddddFddddddd',
+      'DDdddddddddddddD',
+    ], { D: '#1a3a5c', d: '#2a5a8c', w: '#3a78b8', F: '#aaccee' });
 
-    // SNES stone brick wall with mortar lines, highlights top-left of bricks
+    // GBA-style stone brick wall — dark mortar, brick faces with highlights and shadows
     this.px('tile_wall', [
-      'oooooooooooooooo',
-      'oLLLLLLosLLLLLo',
-      'oLSSSSSSoSSSSSLo',
-      'oLSSSSSSoSSSSSLo',
-      'oSSSSSSSSSSSSSSo',
-      'oSSSSSSSSSSSSSSo',
-      'oooooooooooooooo',
-      'oLLLLoosLLLLLLo',
-      'oLSSSooSSSSSSLo',
-      'oLSSSooSSSSSSLo',
-      'oSSSSooSSSSSSso',
-      'oSSSSooSSSSSSso',
-      'oooooooooooooooo',
-      'oLLLLLLosLLLLLo',
-      'oLSSSSSSoSSSSSLo',
-      'oooooooooooooooo',
-    ], { S: '#787068', s: '#404038', L: '#A8A090', o: '#181810' });
+      'mmmmmmmmmmmmmmmm',
+      'mHBBBBBBmBBBBBBm',
+      'mHBBssBBmBBssBBm',
+      'mBBBBBBBmBBBBBBm',
+      'mBBBBBBBmBBBBBBm',
+      'mBBBBBBsmBBBBBBs',
+      'mmmmmmmmmmmmmmmm',
+      'mHBBBBmmBBBBBBBm',
+      'mHBBBBmmBBBBBBHm',
+      'mBBssmmmmBBssBBm',
+      'mBBBBmmmmBBBBBBm',
+      'mBBBBmmmmBBBBBBs',
+      'mmmmmmmmmmmmmmmm',
+      'mHBBBBBBmBBBBBBm',
+      'mBBBBBBBmBBBBBHm',
+      'mmmmmmmmmmmmmmmm',
+    ], { B: '#484848', s: '#2e2e2e', H: '#5e5e5e', m: '#222222' });
 
     // SNES dungeon floor tiles (dark with seam lines)
     this.px('tile_floor', [
@@ -235,45 +345,45 @@ class PreloadScene extends Phaser.Scene {
       'ffffffffffffffffL',
     ], { F: '#302820', f: '#181010', L: '#504038' });
 
-    // SNES top-down tree canopy (circle of dark/medium/light green, brown trunk bottom)
+    // GBA-style dense forest tile — rich canopy, brown trunk, grass base
     this.px('tile_tree', [
-      'xxxxxxxxGGxxxxxx',
-      'xxxxxxGGGGGGxxxx',
-      'xxxxxGlGGGGlGxxx',
-      'xxxxGGGGGGGGGGxx',
-      'xxxGGGGlGGGlGGGx',
-      'xxxGGGGGGGGGGGGx',
-      'xxxGGlGGGGGGlGGx',
-      'xxxxGGGGGGGGGGxx',
-      'xxxxxGGGGGGGGxxx',
-      'xxxxxxGGGGGGxxxx',
-      'xxxxxxxGGGGxxxxx',
-      'xxxxxxxttttxxxxx',
-      'xxxxxxxttttxxxxx',
-      'xxxxxxxxxxxxxxxx',
-      'xxxxxxxxxxxxxxxx',
-      'xxxxxxxxxxxxxxxx',
-    ], { G: '#106010', g: '#0A480A', l: '#20A020', t: '#783820', x: null });
+      'GGGGGGDDDDGGGGGG',
+      'GGGGDDDMDDDDGGGG',
+      'GGGDDMMMDDMMDGGG',
+      'GGDDMMhDDDhMMDGG',
+      'GDDMMhMMMMMhMDDG',
+      'GDDMMMMMMMMMMDDG',
+      'GDDMhMMMMMMMhDDG',
+      'GGDDMMMMMMMMMDGG',
+      'GGGDDMMMMMMMDGGG',
+      'GGGGDDDMDDDDGGGG',
+      'GGGGGGDDDDGGGGGG',
+      'GGGGGGGTTTGGGGGG',
+      'GGGGGGGTTTGGGGGG',
+      'GGGGGGbGGGGGGGGG',
+      'GGGGGGGGGGGGGGGG',
+      'GGGGGGGGGGGGGGGG',
+    ], { D: '#0e3a05', M: '#1a5c0a', h: '#2a7c14', T: '#5a3010', G: '#4a8c3f', b: '#386030' });
 
-    // SNES mountain peak (gray rocks, white snow caps)
+    // GBA-style rocky mountain — dark peaks, gray rock faces, snow cap, crevice details
     this.px('tile_mountain', [
-      'xxxxxxxxxxxxxxxx',
-      'xxxxxxxMxxxxxxxx',
-      'xxxxxxmMmxxxxxxx',
-      'xxxxxmMSMmxxxxxx',
-      'xxxxmmMSSMmmxxxx',
-      'xxxmmmSSSSMmmxxx',
-      'xxmmmmSSSSSMmmxx',
-      'xmmmmmSSSSMMmmmx',
-      'mmmmmmSSSSMMmmmm',
-      'MmmmmMSSSSMmmmmM',
-      'MMmmmMSSSSMMmmmM',
-      'MMMmmMSSSSMmmmmM',
-      'MMMMmMMMMMMmmmmM',
-      'MMMMMMMMMMMMmmmM',
-      'MMMMMMMMMMMMmmmM',
-      'oooooooooooooooo',
-    ], { M: '#808888', S: '#D8E0E8', m: '#484848', o: '#181818' });
+      'RRRRRRRRRRRRRRRR',
+      'RRRRRRRPRRRRRRrR',
+      'RRRRRRPPPRRRRRRr',
+      'RRRRRPPsPPRRRRRR',
+      'RRRRPPPssPPPRRRR',
+      'RRRPPPSSSSPPPRRR',
+      'RRPPPPSSSSsPPPRR',
+      'RPPPPcSSSSPPPPPR',
+      'PPPPPcSSSSPPPPPP',
+      'RPPPPPSSSSPPPPRP',
+      'RRPPPPSSSsPPPRRP',
+      'RRRPPcPPPPcPPRRP',
+      'RRRRPPPPPPPcPRRP',
+      'RRRRRRRRRRRRPccR',
+      'RRRRRRRRRRRRRccR',
+      'RRRRRRRRRRRRRRRR',
+    ], { P: '#3d3535', S: '#e8e8f0', s: '#c0c0d0', R: '#2a2a2a', r: '#303030', c: '#1a1a1a' });
 
     // SNES desert sand with subtle ripple texture
     this.px('tile_sand', [
@@ -314,6 +424,46 @@ class PreloadScene extends Phaser.Scene {
       'GGGGGGGGGGGGGGGG',
       'GGGGGGGGGGGGGGGg',
     ], { G: '#244A18', g: '#143008', l: '#2E6020' });
+
+    // Cliff face — solid warm brown (south-face of elevated platform)
+    this.px('tile_cliff', [
+      'DDDDDDDDDDDDDDDD',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBbBBBBbBBBBbBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBbBBBBBbBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBbBBBBBBBBbBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'SSSSSSSSSSSSSSSS',
+      'ssssssssssssssss',
+    ], { B: '#a0622a', b: '#7a4818', D: '#3a1a08', S: '#6a3c10', s: '#3a2008' });
+
+    // Ledge — same brown but with grass strip at top (climbable step)
+    this.px('tile_ledge', [
+      'GGGGGGGGGGGGGGGG',
+      'GGGGGGGGGGGGGGGG',
+      'GgGGGGGGGGGGGGGG',
+      'DDDDDDDDDDDDDDDD',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBbBBBBbBBBBbBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBbBBBBBbBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'BBBBBBBBBBBBBBBB',
+      'SSSSSSSSSSSSSSSS',
+      'ssssssssssssssss',
+      'GGGGGGGGGGGGGGGG',
+    ], { G: '#4a8c3f', g: '#386030', B: '#a0622a', b: '#7a4818', D: '#3a1a08', S: '#6a3c10', s: '#3a2008' });
   }
 
   // ── PLAYER ────────────────────────────────────────────────────────────
@@ -662,6 +812,34 @@ class PreloadScene extends Phaser.Scene {
       'xxxxxxxxxxxxxxxxxxxxxxxx',
     ], { G: '#FFCC00', R: '#FF4400', k: '#FFFFFF', d: '#FFE880', E: '#FF0000', x: null });
 
+    // card_art_demon_mythic: silver/purple transcendent demon, ornate (24x24)
+    this.px('card_art_demon_mythic', [
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxSSxxxxxxxSSxxxxxx',
+      'xxxxxxSSSxxxxxxxSSSxxxxx',
+      'xxxxxxSSSSSSSSSSSSSSxxxx',
+      'xxxxxSSPPPPPPPPPPPSSxxxx',
+      'xxxxxSPPPpkkkpPPPPSxxxxx',
+      'xxxxxSPPpkEkkkEkPPSxxxxx',
+      'xxxxxSPPpkkkkkkkPPSxxxxx',
+      'xxxxxxSPPkxkxkxxPPSxxxxx',
+      'xxxxxxxSPPPkkkPPSxxxxxxx',
+      'xxxxxxxxSPPPPPPSxxxxxxxx',
+      'xxxxxxxSPPPPPPPPSxxxxxxx',
+      'xxxxxxxSPPPPPPPPSxxxxxxx',
+      'xxxxxxSPPPPPPPPPPSxxxxxx',
+      'xxxxxSPPSSxxxxxxxxSSPSxx',
+      'xxxxxSPPSSxxxxxxxxSSPSxx',
+      'xxxxxxSPSxxxxxxxxxxxxxxxxx',
+      'xxxxxxxSSxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxx',
+    ], { S: '#AAAACC', P: '#9933CC', k: '#EEDDFF', p: '#CC88FF', E: '#FF44FF', x: null });
+
     // card_art_spell_damage: orange fireball with yellow core (24x24)
     this.px('card_art_spell_damage', [
       'xxxxxxxxxxxxxxxxxxxxxxxx',
@@ -753,41 +931,138 @@ class PreloadScene extends Phaser.Scene {
   // fallback from makeTiles()/makeEnemies() etc. is kept as-is.
 
   upgradeToGBAGraphics() {
-    // ── tile_grass: only tile from the Pokemon FRLG tileset ──────────────
-    if (this.textures.exists('pk_tileset2')) {
-      const pk = this.textures.get('pk_tileset2').getSourceImage();
-      const t = this.textures.get('tile_grass');
-      if (t) {
-        const c = t.context;
-        c.imageSmoothingEnabled = false;
-        c.clearRect(0, 0, t.width, t.height);
-        // 16×16 tile slot at (0,52); skip 1px separator on each edge → sample 14×14 at (1,53)
-        c.drawImage(pk, 1, 53, 14, 14, 0, 0, 32, 32);
-        t.refresh();
-      }
+    const copyTile = (srcKey, destKey, sx, sy, sw, sh) => {
+      if (!this.textures.exists(srcKey) || !this.textures.exists(destKey)) return;
+      const src  = this.textures.get(srcKey).getSourceImage();
+      const dest = this.textures.get(destKey);
+      const ctx  = dest.getContext();
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, 32, 32);
+      ctx.drawImage(src, sx, sy, sw, sh, 0, 0, 32, 32);
+      dest.refresh();
+    };
+
+    // NOTE: ground tile art is handled by makeTiles() procedural pixel art —
+    // Mystic Woods tilesheet pixel offsets are version-dependent, so we leave
+    // all tile_* textures as drawn by makeTiles() and only upgrade characters.
+    // The canvas overrides below were removed — px() art in makeTiles() is more detailed.
+
+    if (false && this.textures.exists('tile_water')) {
+      const t = this.textures.get('tile_water');
+      const ctx = t.getContext();
+      ctx.clearRect(0, 0, 32, 32);
+      // Deep base
+      ctx.fillStyle = '#1a3a5c'; ctx.fillRect(0, 0, 32, 32);
+      // Mid-tone wave bands
+      ctx.fillStyle = '#2a5a8c';
+      ctx.fillRect(0, 2, 32, 4);
+      ctx.fillRect(0, 10, 32, 4);
+      ctx.fillRect(0, 18, 32, 4);
+      ctx.fillRect(0, 26, 32, 4);
+      // Lighter wave streaks
+      ctx.fillStyle = '#3a78b8';
+      ctx.fillRect(2, 3, 6, 2);  ctx.fillRect(14, 3, 8, 2);
+      ctx.fillRect(6, 11, 10, 2); ctx.fillRect(22, 11, 6, 2);
+      ctx.fillRect(0, 19, 4, 2);  ctx.fillRect(12, 19, 12, 2);
+      ctx.fillRect(4, 27, 8, 2);  ctx.fillRect(20, 27, 6, 2);
+      // Foam flecks (1x1 bright spots)
+      ctx.fillStyle = '#aaccee';
+      [[4,4],[10,12],[18,6],[26,20],[8,28],[22,14],[16,24],[2,16]].forEach(([x,y]) => ctx.fillRect(x, y, 2, 2));
+      t.refresh();
     }
 
-    // ── Solid color fills for all other tiles ─────────────────────────────
-    // (tileset coords to be refined later — solid colors until then)
-    const solid = (key, color) => {
-      if (!this.textures.exists(key)) return;
-      const t = this.textures.get(key);
-      const c = t.context;
-      c.fillStyle = color;
-      c.fillRect(0, 0, t.width, t.height);
+    // ── GBA-style dense forest tree tile ───────────────────────────────────
+    if (false && this.textures.exists('tile_tree')) {
+      const t = this.textures.get('tile_tree');
+      const ctx = t.getContext();
+      ctx.clearRect(0, 0, 32, 32);
+      // Shadow base — darkest outer ring
+      ctx.fillStyle = '#0e3a05'; ctx.fillRect(8, 2, 16, 18);
+      ctx.fillRect(4, 6, 24, 10);
+      ctx.fillRect(6, 4, 20, 14);
+      // Mid-tone canopy fill
+      ctx.fillStyle = '#1a5c0a';
+      ctx.fillRect(6, 4, 20, 14);
+      ctx.fillRect(8, 2, 16, 2);
+      ctx.fillRect(4, 8, 24, 8);
+      // Highlight clusters (bright patches, top-left light source)
+      ctx.fillStyle = '#2a7c14';
+      ctx.fillRect(8, 4, 6, 4);
+      ctx.fillRect(16, 6, 6, 4);
+      ctx.fillRect(10, 10, 4, 4);
+      ctx.fillRect(20, 10, 4, 4);
+      ctx.fillRect(14, 8, 4, 2);
+      // Bright specular dot
+      ctx.fillStyle = '#3a9c1a';
+      ctx.fillRect(10, 5, 2, 2);
+      ctx.fillRect(18, 7, 2, 2);
+      // Shadow crevices
+      ctx.fillStyle = '#072804';
+      ctx.fillRect(14, 12, 2, 4);
+      ctx.fillRect(8, 10, 2, 2);
+      ctx.fillRect(22, 12, 2, 2);
+      // Brown trunk
+      ctx.fillStyle = '#5a3010'; ctx.fillRect(13, 20, 6, 12);
+      ctx.fillStyle = '#3d1e08'; ctx.fillRect(15, 20, 2, 12);
+      ctx.fillStyle = '#7a4820'; ctx.fillRect(13, 20, 2, 4);
       t.refresh();
-    };
-    solid('tile_grave_grass', '#1e4a1a');  // dark green
-    solid('tile_sand',        '#b89018');  // dark yellow
-    solid('tile_dirt',        '#5a3010');  // dark brown
-    solid('tile_water',       '#1a3aaa');  // blue
-    solid('tile_floor',       '#909090');  // light grey
-    solid('tile_mountain',    '#4a4848');  // dark brown-grey
-    solid('tile_wall',        '#0d0d0d');  // black
-    // tile_tree: keep the pixel-art canopy drawn in makeTiles()
+    }
 
-    // ── Player animations (char_1, 32×32, 3 cols × 4 rows) ───────────────
-    if (this.textures.exists('char_1')) {
+    // ── GBA-style rocky mountain tile ──────────────────────────────────────
+    if (!this.textures.exists('mw_walls') && this.textures.exists('tile_mountain')) {
+      const t = this.textures.get('tile_mountain');
+      const ctx = t.getContext();
+      ctx.clearRect(0, 0, 32, 32);
+      // Dark base (shadow/background rock)
+      ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0, 0, 32, 32);
+      // Medium gray rock face — main peak
+      ctx.fillStyle = '#3d3535';
+      ctx.fillRect(14, 2, 4, 4);
+      ctx.fillRect(12, 6, 8, 4);
+      ctx.fillRect(10, 10, 12, 4);
+      ctx.fillRect(8, 14, 16, 6);
+      ctx.fillRect(6, 20, 20, 8);
+      ctx.fillRect(4, 28, 24, 4);
+      // Secondary rock face (offset peak, left side)
+      ctx.fillStyle = '#342e2e';
+      ctx.fillRect(2, 14, 8, 4);
+      ctx.fillRect(0, 18, 10, 6);
+      ctx.fillRect(0, 24, 14, 8);
+      // Highlight face (right-center catches light)
+      ctx.fillStyle = '#504848';
+      ctx.fillRect(16, 8, 6, 6);
+      ctx.fillRect(18, 14, 8, 6);
+      ctx.fillRect(20, 20, 8, 8);
+      // Crevice lines (dark vertical cracks)
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(14, 10, 2, 6);
+      ctx.fillRect(20, 16, 2, 8);
+      ctx.fillRect(8, 22, 2, 6);
+      ctx.fillRect(24, 20, 2, 4);
+      // Snow cap
+      ctx.fillStyle = '#e8e8f0';
+      ctx.fillRect(14, 2, 4, 2);
+      ctx.fillRect(13, 4, 6, 2);
+      ctx.fillRect(12, 6, 8, 2);
+      // Snow shadow edge
+      ctx.fillStyle = '#c0c0d0';
+      ctx.fillRect(12, 8, 4, 2);
+      ctx.fillRect(19, 8, 2, 2);
+      t.refresh();
+    }
+
+    // ── Mystic Woods player (48×48 spritesheet) ────────────────────────────
+    if (this.textures.exists('mw_player')) {
+      const mk = (s, e) => this.anims.generateFrameNumbers('mw_player', { start: s, end: e });
+      this.anims.create({ key: 'player_walk_down',  frames: mk(0, 5),  frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_walk_right', frames: mk(6, 11), frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_walk_up',    frames: mk(12,17), frameRate: 8, repeat: -1 });
+      // Left walk uses right-walk frames; WorldScene sets flipX(true) when walking left
+      this.anims.create({ key: 'player_walk_left',  frames: mk(6, 11), frameRate: 8, repeat: -1 });
+      this.anims.create({ key: 'player_idle', frames: [{ key: 'mw_player', frame: 0 }], frameRate: 1, repeat: -1 });
+      window.GBA_PLAYER = 'mw_player';
+    } else if (this.textures.exists('char_1')) {
+      // Fallback: character pack
       const mk = (s, e) => this.anims.generateFrameNumbers('char_1', { start: s, end: e });
       this.anims.create({ key: 'player_walk_down',  frames: mk(0, 2),  frameRate: 8, repeat: -1 });
       this.anims.create({ key: 'player_walk_left',  frames: mk(3, 5),  frameRate: 8, repeat: -1 });
@@ -797,16 +1072,31 @@ class PreloadScene extends Phaser.Scene {
       window.GBA_PLAYER = 'char_1';
     }
 
-    // ── Enemy sprites → character pack ────────────────────────────────────
+    // ── Mystic Woods enemy sprites (skeleton, slime) ───────────────────────
+    if (this.textures.exists('mw_skeleton')) {
+      this.anims.create({ key: 'mw_skeleton_walk', frames: this.anims.generateFrameNumbers('mw_skeleton', { start: 0, end: 5 }), frameRate: 6, repeat: -1 });
+      this.anims.create({ key: 'mw_skeleton_idle', frames: [{ key: 'mw_skeleton', frame: 0 }], frameRate: 1, repeat: -1 });
+      // Remap hard enemies to skeleton
+      window.ENEMIES.forEach(e => { if (e.sprite === 'enemy_7' || e.sprite === 'enemy_8') e.sprite = 'mw_skeleton'; });
+    }
+    if (this.textures.exists('mw_slime')) {
+      this.anims.create({ key: 'mw_slime_walk', frames: this.anims.generateFrameNumbers('mw_slime', { start: 0, end: 5 }), frameRate: 6, repeat: -1 });
+      this.anims.create({ key: 'mw_slime_idle', frames: [{ key: 'mw_slime', frame: 0 }], frameRate: 1, repeat: -1 });
+      window.ENEMIES.forEach(e => { if (e.sprite === 'enemy_5') e.sprite = 'mw_slime'; });
+    }
+
+    // ── Remaining enemies → character pack ────────────────────────────────
     for (let i = 0; i < 10; i++) {
       const charKey = 'char_' + (i + 1);
       if (!this.textures.exists(charKey)) continue;
       window.ENEMIES.forEach(e => { if (e.sprite === 'enemy_' + i) e.sprite = charKey; });
-      this.anims.create({ key: charKey + '_walk', frames: this.anims.generateFrameNumbers(charKey, { start: 0, end: 2 }), frameRate: 6, repeat: -1 });
-      this.anims.create({ key: charKey + '_idle', frames: [{ key: charKey, frame: 1 }], frameRate: 1, repeat: -1 });
+      if (!this.anims.exists(charKey + '_walk'))
+        this.anims.create({ key: charKey + '_walk', frames: this.anims.generateFrameNumbers(charKey, { start: 0, end: 2 }), frameRate: 6, repeat: -1 });
+      if (!this.anims.exists(charKey + '_idle'))
+        this.anims.create({ key: charKey + '_idle', frames: [{ key: charKey, frame: 1 }], frameRate: 1, repeat: -1 });
     }
 
-    window.ANIMAL_KEYS = []; // animals removed
+    window.ANIMAL_KEYS = [];
   }
 
   // ── UI ELEMENTS ───────────────────────────────────────────────────────

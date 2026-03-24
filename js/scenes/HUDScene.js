@@ -4,55 +4,59 @@ class HUDScene extends Phaser.Scene {
   create() {
     // ── Top bar ───────────────────────────────────────────────────────────
     const bar = this.add.graphics();
-    bar.fillStyle(0x000000, 0.55);
-    bar.fillRect(0, 0, 960, 40);
+    bar.fillStyle(0x000000, 0.6);
+    bar.fillRect(0, 0, 960, 36);
 
+    // Gold
     this.moneyText = this.add.text(12, 8, '', {
-      fontSize: '16px', fontFamily: 'monospace',
+      fontSize: '15px', fontFamily: 'monospace',
       color: '#ffd700', stroke: '#000', strokeThickness: 3
     });
 
-    this.deckText = this.add.text(200, 8, '', {
-      fontSize: '16px', fontFamily: 'monospace',
+    // Deck
+    this.deckText = this.add.text(150, 8, '', {
+      fontSize: '15px', fontFamily: 'monospace',
       color: '#aaddff', stroke: '#000', strokeThickness: 3
     });
 
-    this.collectionText = this.add.text(400, 8, '', {
-      fontSize: '16px', fontFamily: 'monospace',
-      color: '#cc88ff', stroke: '#000', strokeThickness: 3
-    });
-
-    // Level text (between collection and hearts)
-    this.levelText = this.add.text(545, 8, '', {
+    // Level
+    this.levelText = this.add.text(310, 8, '', {
       fontSize: '14px', fontFamily: 'monospace',
       color: '#ffdd44', stroke: '#000', strokeThickness: 3
     });
 
-    // Hearts container
-    this.heartsContainer = this.add.container(620, 8);
+    // Elevation indicator
+    this.elevText = this.add.text(480, 8, '', {
+      fontSize: '13px', fontFamily: 'monospace',
+      color: '#88ddff', stroke: '#000', strokeThickness: 2
+    }).setOrigin(0.5, 0);
 
-    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes'];
+    // Hearts container (right-aligned area)
+    this.heartsContainer = this.add.container(480, 6);
+
+    // Island name — right side
+    const ISLAND_NAMES = ['Home Island', 'Inferno Island', 'Frost Wastes', 'Thunder Peak'];
     const islandName = ISLAND_NAMES[window.GameState?.currentIsland || 0] || 'Home Island';
-    this.add.text(680, 10, 'WASD: Move  |  F: Interact  |  Space: Jump  |  M: Menu  |  ' + islandName, {
-      fontSize: '10px', fontFamily: 'monospace',
-      color: '#888888', stroke: '#000', strokeThickness: 2
-    });
+    this.islandText = this.add.text(948, 8, islandName, {
+      fontSize: '13px', fontFamily: 'monospace',
+      color: '#aaaaaa', stroke: '#000', strokeThickness: 2
+    }).setOrigin(1, 0);
 
     // ── Minimap ───────────────────────────────────────────────────────────
     // Panel background
     this.minimapBg = this.add.graphics();
     this.minimapBg.fillStyle(0x000000, 0.7);
-    this.minimapBg.fillRect(750, 46, 204, 154);
+    this.minimapBg.fillRect(750, 42, 204, 154);
     this.minimapBg.lineStyle(1, 0x555555, 1);
-    this.minimapBg.strokeRect(750, 46, 204, 154);
+    this.minimapBg.strokeRect(750, 42, 204, 154);
 
     // Canvas for minimap drawing (remove stale texture if HUDScene was restarted)
     if (this.textures.exists('hud_minimap')) this.textures.remove('hud_minimap');
     this._minimapCanvas = this.textures.createCanvas('hud_minimap', 200, 150);
-    this.minimapImg = this.add.image(751, 47, 'hud_minimap').setOrigin(0, 0).setDepth(50);
+    this.minimapImg = this.add.image(751, 43, 'hud_minimap').setOrigin(0, 0).setDepth(50);
 
-    this.add.text(752, 48, 'MAP', {
-      fontSize: '8px', fontFamily: 'monospace', color: '#aaaaaa'
+    this.add.text(752, 44, 'MAP', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#888888'
     }).setDepth(51);
 
     // Active quest tracker (bottom-left)
@@ -81,12 +85,17 @@ class HUDScene extends Phaser.Scene {
 
   updateHUD() {
     this.moneyText.setText('G: ' + window.GameState.playerMoney);
-    this.deckText.setText('Deck: ' + window.GameState.playerDeck.length + ' cards');
-    this.collectionText.setText('Coll: ' + window.GameState.playerCollection.length);
+    const deckLen = window.GameState.playerDeck.length;
+    this.deckText.setText('Deck: ' + deckLen + '/30');
+    this.deckText.setStyle({ color: deckLen === 30 ? '#aaffaa' : '#ffaa44' });
     const lv  = window.GameState.playerLevel  || 1;
     const xp  = window.GameState.playerXP     || 0;
     const xpN = lv * 50;
-    this.levelText.setText('Lv.' + lv + ' [' + xp + '/' + xpN + ']');
+    this.levelText.setText('Lv.' + lv + '  ' + xp + '/' + xpN + 'xp');
+    const world = this.scene.get('WorldScene');
+    const elev = world?.playerElevation ?? 0;
+    const elevLabels = ['Z:0 Ground', 'Z:1 Ledge', 'Z:2 High', 'Z:3 Peak'];
+    if (this.elevText) this.elevText.setText(elevLabels[elev] || ('Z:' + elev));
     this._renderHearts();
     this._renderActiveQuest();
   }
@@ -97,8 +106,10 @@ class HUDScene extends Phaser.Scene {
     if (!qs || !window.QUESTS) return;
     const currentIsland = window.GameState.currentIsland || 0;
     // Prefer quests matching current island; fall back to any active quest
-    const active = window.QUESTS.find(q => (q.island ?? 0) === currentIsland && qs[q.id]?.status === 'active')
-                || window.QUESTS.find(q => qs[q.id]?.status === 'active');
+    const complete = window.QUESTS.find(q => (q.island ?? 0) === currentIsland && qs[q.id]?.status === 'complete');
+    const active   = complete
+                  || window.QUESTS.find(q => (q.island ?? 0) === currentIsland && qs[q.id]?.status === 'active')
+                  || window.QUESTS.find(q => qs[q.id]?.status === 'active');
     if (!active) {
       this.questHintText.setText('');
       return;
@@ -108,7 +119,13 @@ class HUDScene extends Phaser.Scene {
     const needed = obj.count || 1;
     const prog   = Math.min(state.progress, needed);
     const progStr = obj.type.startsWith('kill_boss') ? (prog >= 1 ? '1/1' : '0/1') : prog + '/' + needed;
-    this.questHintText.setText('⚔ Quest: ' + active.name + '  [' + progStr + ']  — ' + active.npc);
+    if (state.status === 'complete') {
+      this.questHintText.setText('★ ' + active.name + ' — RETURN TO ' + active.npc.toUpperCase());
+      this.questHintText.setStyle({ color: '#ffd700' });
+    } else {
+      this.questHintText.setText('⚔ Quest: ' + active.name + '  [' + progStr + ']  — ' + active.npc);
+      this.questHintText.setStyle({ color: '#8899bb' });
+    }
   }
 
   _renderHearts() {

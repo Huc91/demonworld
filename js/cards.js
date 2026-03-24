@@ -751,6 +751,57 @@ window.CARDS = [
   { id: 'spell_063', name: 'Venom Strike',  type: 'spell', cost: 1, manaValue: 1, rarity: 'common',   effect: 'poison_one_enemy', value: 4, desc: 'Poison one enemy demon for 4 turns (1 dmg/turn).' },
   { id: 'spell_064', name: 'Cure',          type: 'spell', cost: 1, manaValue: 1, rarity: 'uncommon', effect: 'cure_all_friendly',value: 0, desc: 'Remove all poison from your demons.' },
   { id: 'spell_065', name: 'Plague Surge',  type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',     effect: 'poison_face',      value: 2, desc: 'Deal 2 damage now, then 2 more each turn for 2 turns.' },
+
+  // ══════════════════════════════════════════════════════
+  //  THUNDER PEAK — storm/lightning demons
+  // ══════════════════════════════════════════════════════
+  {
+    id: 'demon_118', name: 'Spark Imp', subtype: 'thunder', type: 'demon',
+    cost: 1, manaValue: 1, atk: 2, hp: 1, rarity: 'common',
+    ability: 'haste',
+    abilityDesc: 'Haste — can attack immediately.',
+    desc: 'Born in a lightning strike. Gone in the next.',
+  },
+  {
+    id: 'demon_119', name: 'Storm Hound', subtype: 'thunder', type: 'demon',
+    cost: 2, manaValue: 1, atk: 3, hp: 2, rarity: 'common',
+    ability: 'haste_poisonous',
+    abilityDesc: 'Haste. Poisonous — kills any demon it damages.',
+    desc: 'The thunder carries it. The lightning is its bite.',
+  },
+  {
+    id: 'demon_120', name: 'Tempest Knight', subtype: 'thunder', type: 'demon',
+    cost: 3, manaValue: 1, atk: 2, hp: 6, rarity: 'uncommon',
+    ability: 'taunt',
+    abilityDesc: 'Taunt — enemies must attack this first.',
+    desc: 'Stands in the eye of the storm. Unmoved.',
+  },
+  {
+    id: 'demon_121', name: 'Thunder Drake', subtype: 'thunder', type: 'demon',
+    cost: 3, manaValue: 1, atk: 5, hp: 2, rarity: 'rare',
+    ability: 'haste',
+    abilityDesc: 'Haste — can attack immediately.',
+    desc: 'Strikes from the clouds before you can react.',
+  },
+  {
+    id: 'demon_122', name: 'Stormcaller', subtype: 'thunder', type: 'demon',
+    cost: 4, manaValue: 1, atk: 3, hp: 5, rarity: 'rare',
+    ability: 'battlecry_aoe_2',
+    abilityDesc: 'Battlecry: Deal 2 damage to all enemy demons.',
+    desc: '"The storm does not choose its victims. It teaches them." — Stormcaller IX',
+  },
+  {
+    id: 'demon_123', name: 'Thunder Sovereign', subtype: 'thunder', type: 'demon',
+    cost: 5, manaValue: 1, atk: 6, hp: 6, rarity: 'mythic',
+    ability: 'battlecry_damage_player_2',
+    abilityDesc: 'Battlecry: Deal 2 damage to the enemy.',
+    desc: '"He who commands the storm commands all. And I command the storm." — Thunder Sovereign',
+  },
+
+  // New spells for Thunder Peak
+  { id: 'spell_066', name: 'Lightning Bolt',  type: 'spell', cost: 2, manaValue: 1, rarity: 'rare',      effect: 'damage',    value: 6, desc: 'Deal 6 damage. The sky does not warn you.' },
+  { id: 'spell_067', name: 'Chain Lightning', type: 'spell', cost: 3, manaValue: 1, rarity: 'rare',      effect: 'aoe_enemy', value: 2, desc: 'Deal 2 damage to all enemy demons. The chain never ends.' },
+  { id: 'spell_068', name: 'Thunder Ward',    type: 'spell', cost: 1, manaValue: 1, rarity: 'uncommon',  effect: 'buff_hp',   value: 3, desc: 'Give a friendly demon +3 HP. Hardened by lightning strikes.' },
 ];
 
 window.CARD_MAP = {};

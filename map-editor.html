@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bloodungeon Map Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #eee; font-family: monospace; display: flex; height: 100vh; overflow: hidden; }
+
+  #sidebar {
+    width: 220px; min-width: 220px; background: #1a1a1a; border-right: 2px solid #333;
+    display: flex; flex-direction: column; overflow-y: auto; padding: 10px; gap: 8px;
+  }
+
+  #sidebar h2 { color: #c8a000; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  #sidebar label { font-size: 11px; color: #aaa; }
+  #sidebar input[type=number], #sidebar select, #sidebar input[type=text] {
+    width: 100%; background: #222; border: 1px solid #444; color: #eee;
+    padding: 3px 5px; font-size: 12px; font-family: monospace;
+  }
+
+  .section { display: flex; flex-direction: column; gap: 4px; }
+
+  .tile-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+  }
+  .tile-btn {
+    display: flex; flex-direction: column; align-items: center; cursor: pointer;
+    border: 2px solid #333; border-radius: 3px; padding: 3px 2px; font-size: 9px;
+    color: #ccc; background: #222; transition: border-color 0.1s;
+  }
+  .tile-btn:hover { border-color: #888; }
+  .tile-btn.active { border-color: #c8a000; color: #c8a000; }
+  .tile-swatch { width: 28px; height: 20px; border-radius: 2px; margin-bottom: 2px; }
+
+  .tool-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .tool-btn {
+    background: #222; border: 2px solid #333; color: #ccc; cursor: pointer;
+    padding: 5px 4px; font-size: 11px; border-radius: 3px; text-align: center;
+  }
+  .tool-btn:hover { border-color: #888; }
+  .tool-btn.active { border-color: #c8a000; color: #c8a000; background: #2a2a18; }
+
+  button.action {
+    background: #2a1a00; border: 1px solid #c8a000; color: #c8a000;
+    padding: 5px 8px; cursor: pointer; font-family: monospace; font-size: 11px;
+    border-radius: 3px; width: 100%;
+  }
+  button.action:hover { background: #3a2a00; }
+  button.action.danger { border-color: #a03030; color: #e04040; background: #1a0808; }
+  button.action.danger:hover { background: #2a1010; }
+
+  #coords { font-size: 11px; color: #666; text-align: center; }
+
+  #canvas-wrap {
+    flex: 1; overflow: hidden; position: relative; background: #0a0a0a; cursor: crosshair;
+  }
+  #canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
+
+  #modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  #modal-bg.open { display: flex; }
+  #modal {
+    background: #1a1a1a; border: 2px solid #c8a000; padding: 16px; width: 680px;
+    max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; gap: 10px;
+  }
+  #modal h3 { color: #c8a000; font-size: 14px; }
+  #modal textarea {
+    flex: 1; min-height: 320px; background: #111; color: #8afa8a; border: 1px solid #333;
+    font-family: monospace; font-size: 12px; padding: 8px; resize: vertical;
+  }
+  .modal-btns { display: flex; gap: 8px; }
+  .modal-btns button {
+    flex: 1; background: #222; border: 1px solid #555; color: #eee;
+    padding: 7px; cursor: pointer; font-family: monospace; font-size: 12px;
+  }
+  .modal-btns button:hover { border-color: #c8a000; color: #c8a000; }
+  .modal-btns button.primary { border-color: #c8a000; color: #c8a000; background: #2a2a10; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>🗺 MAP EDITOR</h2>
+
+  <div class="section">
+    <label>Map Size</label>
+    <div style="display:flex;gap:4px;align-items:center">
+      <input type="number" id="inp-w" value="160" min="10" max="400" style="width:70px">
+      <span style="color:#666">×</span>
+      <input type="number" id="inp-h" value="120" min="10" max="300" style="width:70px">
+    </div>
+    <button class="action" id="btn-resize">Resize / New</button>
+  </div>
+
+  <div class="section">
+    <label>Default Fill Tile</label>
+    <select id="sel-fill">
+      <option value="0">GRASS</option>
+      <option value="1">DIRT</option>
+      <option value="2">WATER</option>
+      <option value="3">WALL</option>
+      <option value="4">FLOOR</option>
+      <option value="5">TREE</option>
+      <option value="6">MOUNTAIN</option>
+      <option value="7">SAND</option>
+      <option value="8">GRAVE_GRASS</option>
+      <option value="9">CLIFF</option>
+      <option value="10">LEDGE</option>
+    </select>
+  </div>
+
+  <div class="section">
+    <label>Tiles</label>
+    <div class="tile-grid" id="tile-palette"></div>
+  </div>
+
+  <div class="section">
+    <label>Tool</label>
+    <div class="tool-grid">
+      <button class="tool-btn active" data-tool="paint" title="Paint single tiles (P)">✏ Paint</button>
+      <button class="tool-btn" data-tool="erase" title="Erase back to default (E)">✕ Erase</button>
+      <button class="tool-btn" data-tool="rect" title="Fill rectangle (R)">▭ Rect</button>
+      <button class="tool-btn" data-tool="fill" title="Flood fill (F)">◈ Fill</button>
+      <button class="tool-btn" data-tool="spawn" title="Set spawn tile (S)">⚑ Spawn</button>
+      <button class="tool-btn" data-tool="pick" title="Pick tile color (I)">⊕ Pick</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <label>Spawn Point</label>
+    <div style="display:flex;gap:4px">
+      <div style="flex:1"><label>Col(x)</label><input type="number" id="spawn-x" value="20" min="0"></div>
+      <div style="flex:1"><label>Row(y)</label><input type="number" id="spawn-y" value="60" min="0"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <label>Zoom</label>
+    <input type="range" id="zoom-slider" min="2" max="32" value="8" step="1">
+    <div id="coords">0, 0</div>
+  </div>
+
+  <div class="section">
+    <button class="action" id="btn-export">⬇ Export JS</button>
+    <button class="action" id="btn-import">⬆ Import JS Array</button>
+    <button class="action danger" id="btn-clear">⚠ Clear Map</button>
+  </div>
+
+  <div class="section" style="font-size:10px;color:#555;line-height:1.5">
+    <strong style="color:#666">Shortcuts:</strong><br>
+    P=paint E=erase R=rect F=fill I=pick S=spawn<br>
+    Scroll=zoom Middle/Space+drag=pan<br>
+    Ctrl+Z=undo (10 steps)
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="modal-bg">
+  <div id="modal">
+    <h3 id="modal-title">Export</h3>
+    <textarea id="modal-text" spellcheck="false"></textarea>
+    <div class="modal-btns">
+      <button class="primary" id="modal-copy">Copy to Clipboard</button>
+      <button id="modal-apply" style="display:none">Apply Import</button>
+      <button id="modal-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tile definitions ─────────────────────────────────────────────────────────
+const TILES = [
+  { id: 0,  name: 'GRASS',       color: '#58a832', solid: false },
+  { id: 1,  name: 'DIRT',        color: '#c87820', solid: false },
+  { id: 2,  name: 'WATER',       color: '#2a5a8c', solid: true  },
+  { id: 3,  name: 'WALL',        color: '#484848', solid: true  },
+  { id: 4,  name: 'FLOOR',       color: '#302820', solid: false },
+  { id: 5,  name: 'TREE',        color: '#1a5c0a', solid: true  },
+  { id: 6,  name: 'MOUNTAIN',    color: '#3d3535', solid: true  },
+  { id: 7,  name: 'SAND',        color: '#D0A830', solid: false },
+  { id: 8,  name: 'GRAVE_GRASS', color: '#244A18', solid: false },
+  { id: 9,  name: 'CLIFF',       color: '#a0622a', solid: true  },
+  { id: 10, name: 'LEDGE',       color: '#6a3c10', solid: false },
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let mapW = 160, mapH = 120;
+let map = [];
+let spawnX = 20, spawnY = 60;
+let selectedTile = 0;
+let defaultFill = 0;
+let tool = 'paint';
+let zoom = 8;
+let panX = 0, panY = 0;
+let isPanning = false, panStart = {x:0,y:0}, panOrigin = {x:0,y:0};
+let isDrawing = false;
+let rectStart = null;
+let undoStack = [];
+const MAX_UNDO = 10;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+
+// ── Init map ─────────────────────────────────────────────────────────────────
+function initMap(w, h, fill) {
+  mapW = w; mapH = h;
+  map = [];
+  for (let r = 0; r < h; r++) {
+    map[r] = new Array(w).fill(fill);
+  }
+}
+
+function resizeMap(newW, newH, fill) {
+  const old = map.slice();
+  const oldH = mapH, oldW = mapW;
+  mapW = newW; mapH = newH;
+  map = [];
+  for (let r = 0; r < newH; r++) {
+    map[r] = new Array(newW).fill(fill);
+    if (r < oldH) {
+      for (let c = 0; c < Math.min(newW, oldW); c++) {
+        map[r][c] = old[r][c];
+      }
+    }
+  }
+}
+
+// ── Undo ─────────────────────────────────────────────────────────────────────
+function pushUndo() {
+  const snap = map.map(row => row.slice());
+  undoStack.push(snap);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  map = undoStack.pop();
+  mapH = map.length;
+  mapW = map[0].length;
+  render();
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function resizeCanvas() {
+  canvas.width  = mapW * zoom;
+  canvas.height = mapH * zoom;
+  clampPan();
+  render();
+}
+
+function clampPan() {
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const cw = mapW * zoom, ch = mapH * zoom;
+  panX = Math.max(Math.min(panX, 0), Math.min(0, ww - cw));
+  panY = Math.max(Math.min(panY, 0), Math.min(0, wh - ch));
+  canvas.style.left = panX + 'px';
+  canvas.style.top  = panY + 'px';
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let r = 0; r < mapH; r++) {
+    for (let c = 0; c < mapW; c++) {
+      const t = map[r][c];
+      ctx.fillStyle = TILES[t]?.color || '#ff00ff';
+      ctx.fillRect(c * zoom, r * zoom, zoom, zoom);
+    }
+  }
+  // Grid lines (only when zoom >= 6)
+  if (zoom >= 6) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= mapH; r++) {
+      ctx.beginPath(); ctx.moveTo(0, r * zoom); ctx.lineTo(mapW * zoom, r * zoom); ctx.stroke();
+    }
+    for (let c = 0; c <= mapW; c++) {
+      ctx.beginPath(); ctx.moveTo(c * zoom, 0); ctx.lineTo(c * zoom, mapH * zoom); ctx.stroke();
+    }
+  }
+  // Spawn
+  const sx = spawnX, sy = spawnY;
+  ctx.fillStyle = '#ff4444';
+  ctx.beginPath();
+  ctx.arc((sx + 0.5) * zoom, (sy + 0.5) * zoom, zoom * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `${Math.max(8, zoom * 0.5)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('S', (sx + 0.5) * zoom, (sy + 0.5) * zoom);
+
+  // Rect preview
+  if (tool === 'rect' && rectStart && currentHover) {
+    const r0 = Math.min(rectStart.r, currentHover.r);
+    const c0 = Math.min(rectStart.c, currentHover.c);
+    const r1 = Math.max(rectStart.r, currentHover.r);
+    const c1 = Math.max(rectStart.c, currentHover.c);
+    ctx.fillStyle = 'rgba(200,160,0,0.25)';
+    ctx.fillRect(c0 * zoom, r0 * zoom, (c1 - c0 + 1) * zoom, (r1 - r0 + 1) * zoom);
+    ctx.strokeStyle = '#c8a000';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(c0 * zoom, r0 * zoom, (c1 - c0 + 1) * zoom, (r1 - r0 + 1) * zoom);
+  }
+}
+
+// ── Tile -> row/col from mouse event ─────────────────────────────────────────
+function getTile(e) {
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / zoom);
+  const r = Math.floor((e.clientY - rect.top)  / zoom);
+  if (c < 0 || c >= mapW || r < 0 || r >= mapH) return null;
+  return { r, c };
+}
+
+// ── Flood fill ────────────────────────────────────────────────────────────────
+function floodFill(r, c, from, to) {
+  if (from === to) return;
+  const stack = [[r, c]];
+  const visited = new Set();
+  while (stack.length) {
+    const [cr, cc] = stack.pop();
+    if (cr < 0 || cr >= mapH || cc < 0 || cc >= mapW) continue;
+    const key = cr * mapW + cc;
+    if (visited.has(key)) continue;
+    if (map[cr][cc] !== from) continue;
+    visited.add(key);
+    map[cr][cc] = to;
+    stack.push([cr-1,cc],[cr+1,cc],[cr,cc-1],[cr,cc+1]);
+  }
+}
+
+// ── Tile palette ──────────────────────────────────────────────────────────────
+function buildPalette() {
+  const pal = document.getElementById('tile-palette');
+  pal.innerHTML = '';
+  TILES.forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'tile-btn' + (t.id === selectedTile ? ' active' : '');
+    btn.dataset.id = t.id;
+    btn.innerHTML = `<div class="tile-swatch" style="background:${t.color}"></div>${t.name.replace('_GRASS','_G')}`;
+    btn.addEventListener('click', () => {
+      selectedTile = t.id;
+      document.querySelectorAll('.tile-btn').forEach(b => b.classList.toggle('active', +b.dataset.id === selectedTile));
+      if (tool === 'erase' || tool === 'spawn') setTool('paint');
+    });
+    pal.appendChild(btn);
+  });
+}
+
+// ── Tool buttons ──────────────────────────────────────────────────────────────
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+}
+
+document.querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => setTool(b.dataset.tool));
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.ctrlKey && e.key === 'z') { undo(); return; }
+  const map2 = { p:'paint', e:'erase', r:'rect', f:'fill', i:'pick', s:'spawn' };
+  if (map2[e.key.toLowerCase()]) setTool(map2[e.key.toLowerCase()]);
+});
+
+// ── Mouse events on canvas ────────────────────────────────────────────────────
+let currentHover = null;
+
+wrap.addEventListener('mousemove', e => {
+  // Pan with middle mouse or Space
+  if (isPanning) {
+    panX = panOrigin.x + (e.clientX - panStart.x);
+    panY = panOrigin.y + (e.clientY - panStart.y);
+    clampPan();
+    return;
+  }
+
+  const t = getTile(e);
+  currentHover = t;
+  if (t) {
+    document.getElementById('coords').textContent = `col:${t.c}  row:${t.r}  tile:${TILES[map[t.r][t.c]]?.name}`;
+  }
+
+  if (isDrawing && t) {
+    if (tool === 'paint') {
+      map[t.r][t.c] = selectedTile;
+      render();
+    } else if (tool === 'erase') {
+      map[t.r][t.c] = defaultFill;
+      render();
+    } else if (tool === 'rect') {
+      render(); // re-render for preview
+    }
+  }
+});
+
+wrap.addEventListener('mousedown', e => {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) { // middle or alt+left = pan
+    e.preventDefault();
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    panOrigin = { x: panX, y: panY };
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const t = getTile(e);
+  if (!t) return;
+
+  if (tool === 'pick') {
+    selectedTile = map[t.r][t.c];
+    document.querySelectorAll('.tile-btn').forEach(b => b.classList.toggle('active', +b.dataset.id === selectedTile));
+    setTool('paint');
+    return;
+  }
+
+  if (tool === 'spawn') {
+    spawnX = t.c; spawnY = t.r;
+    document.getElementById('spawn-x').value = spawnX;
+    document.getElementById('spawn-y').value = spawnY;
+    render();
+    return;
+  }
+
+  if (tool === 'fill') {
+    pushUndo();
+    floodFill(t.r, t.c, map[t.r][t.c], selectedTile);
+    render();
+    return;
+  }
+
+  if (tool === 'rect') {
+    if (!rectStart) {
+      pushUndo();
+      rectStart = t;
+      isDrawing = true;
+    }
+    return;
+  }
+
+  pushUndo();
+  isDrawing = true;
+  if (tool === 'paint') map[t.r][t.c] = selectedTile;
+  if (tool === 'erase') map[t.r][t.c] = defaultFill;
+  render();
+});
+
+wrap.addEventListener('mouseup', e => {
+  if (isPanning) { isPanning = false; return; }
+  if (!isDrawing) return;
+
+  if (tool === 'rect' && rectStart && currentHover) {
+    const r0 = Math.min(rectStart.r, currentHover.r);
+    const c0 = Math.min(rectStart.c, currentHover.c);
+    const r1 = Math.max(rectStart.r, currentHover.r);
+    const c1 = Math.max(rectStart.c, currentHover.c);
+    for (let r = r0; r <= r1; r++)
+      for (let c = c0; c <= c1; c++)
+        map[r][c] = selectedTile;
+    rectStart = null;
+    render();
+  }
+
+  isDrawing = false;
+});
+
+wrap.addEventListener('mouseleave', () => {
+  if (isPanning) isPanning = false;
+  isDrawing = false;
+  rectStart = null;
+  currentHover = null;
+});
+
+// Scroll to zoom
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const oldZoom = zoom;
+  const delta = e.deltaY > 0 ? -1 : 1;
+  zoom = Math.max(2, Math.min(32, zoom + delta));
+  if (zoom === oldZoom) return;
+
+  // Zoom toward mouse position
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  // Tile under cursor stays fixed
+  const tileX = (mx - panX) / oldZoom;
+  const tileY = (my - panY) / oldZoom;
+  panX = mx - tileX * zoom;
+  panY = my - tileY * zoom;
+
+  document.getElementById('zoom-slider').value = zoom;
+  resizeCanvas();
+}, { passive: false });
+
+// Space = pan
+let spaceDown = false;
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.target.matches('input,textarea')) {
+    e.preventDefault();
+    spaceDown = true;
+    wrap.style.cursor = 'grab';
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') {
+    spaceDown = false;
+    wrap.style.cursor = 'crosshair';
+  }
+});
+wrap.addEventListener('mousedown', e => {
+  if (spaceDown && e.button === 0) {
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    panOrigin = { x: panX, y: panY };
+  }
+});
+
+// Zoom slider
+document.getElementById('zoom-slider').addEventListener('input', e => {
+  zoom = +e.target.value;
+  resizeCanvas();
+});
+
+// ── Sidebar controls ──────────────────────────────────────────────────────────
+document.getElementById('btn-resize').addEventListener('click', () => {
+  const w = parseInt(document.getElementById('inp-w').value);
+  const h = parseInt(document.getElementById('inp-h').value);
+  const fill = parseInt(document.getElementById('sel-fill').value);
+  if (!confirm(`Resize to ${w}×${h}? Existing tiles outside new bounds will be lost.`)) return;
+  defaultFill = fill;
+  resizeMap(w, h, fill);
+  panX = 0; panY = 0;
+  resizeCanvas();
+});
+
+document.getElementById('sel-fill').addEventListener('change', e => {
+  defaultFill = parseInt(e.target.value);
+});
+
+document.getElementById('spawn-x').addEventListener('change', e => {
+  spawnX = Math.max(0, Math.min(mapW - 1, parseInt(e.target.value) || 0));
+  render();
+});
+document.getElementById('spawn-y').addEventListener('change', e => {
+  spawnY = Math.max(0, Math.min(mapH - 1, parseInt(e.target.value) || 0));
+  render();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!confirm('Clear entire map?')) return;
+  pushUndo();
+  const fill = parseInt(document.getElementById('sel-fill').value);
+  for (let r = 0; r < mapH; r++) map[r].fill(fill);
+  render();
+});
+
+// ── Export ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const lines = [];
+  lines.push(`// ── Generated by Bloodungeon Map Editor ──`);
+  lines.push(`// Map size: ${mapW}×${mapH} tiles  |  Spawn: col=${spawnX} row=${spawnY}`);
+  lines.push(`//`);
+  lines.push(`// Paste this as a new buildMap_NAME() method in WorldScene.js`);
+  lines.push(`// and call it from buildMap() with: if (island === N) { this.buildMap_NAME(); return; }`);
+  lines.push(``);
+  lines.push(`buildMap_myIsland() {`);
+  lines.push(`  const W = ${mapW}, H = ${mapH};`);
+  lines.push(`  this.mapWidth  = W;`);
+  lines.push(`  this.mapHeight = H;`);
+  lines.push(`  this._islandSpawnTile = { x: ${spawnX}, y: ${spawnY} };`);
+  lines.push(``);
+  lines.push(`  const GRASS=0, DIRT=1, WATER=2, WALL=3, FLOOR=4,`);
+  lines.push(`        TREE=5, MOUNTAIN=6, SAND=7, GRAVE_GRASS=8, CLIFF=9, LEDGE=10;`);
+  lines.push(``);
+  lines.push(`  const map = [];`);
+  lines.push(`  for (let r = 0; r < H; r++) map[r] = [`);
+
+  for (let r = 0; r < mapH; r++) {
+    const row = map[r].join(',');
+    lines.push(`    /* r${String(r).padStart(3,'0')} */ ${row},`);
+  }
+  lines.push(`  ].slice(0, W);  // guard`);
+  lines.push(``);
+  lines.push(`  this.mapData = map;`);
+  lines.push(`  window.GameState.mapData = map;`);
+  lines.push(`  this._buildTileSprites(map, W, H);`);
+  lines.push(`}`);
+
+  openModal('Export JS — paste into WorldScene.js', lines.join('\n'), false);
+});
+
+// ── Import ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-import').addEventListener('click', () => {
+  openModal('Import — paste a JS 2D array (e.g. [[0,1,2,...],[...]])', '', true);
+});
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(title, text, isImport) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-text').value = text;
+  document.getElementById('modal-apply').style.display = isImport ? 'block' : 'none';
+  document.getElementById('modal-copy').style.display = isImport ? 'none' : 'block';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('modal-bg').classList.remove('open');
+});
+document.getElementById('modal-bg').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-bg'))
+    document.getElementById('modal-bg').classList.remove('open');
+});
+
+document.getElementById('modal-copy').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('modal-text').value)
+    .then(() => { document.getElementById('modal-copy').textContent = '✓ Copied!'; setTimeout(() => { document.getElementById('modal-copy').textContent = 'Copy to Clipboard'; }, 2000); });
+});
+
+document.getElementById('modal-apply').addEventListener('click', () => {
+  const raw = document.getElementById('modal-text').value.trim();
+  try {
+    // Try to extract the 2D array
+    let data;
+    // If it looks like a raw array
+    if (raw.startsWith('[[')) {
+      data = JSON.parse(raw);
+    } else {
+      // Try eval in a sandbox (the row comment format)
+      const stripped = raw
+        .replace(/\/\*[^*]*\*\//g, '')  // remove /* */ comments
+        .replace(/\/\/[^\n]*/g, '')      // remove // comments
+        .replace(/\bmap\s*\[\s*\]\s*=\s*\[/g, '')
+        .replace(/\]\.slice[^;]*/g, '')
+        .trim();
+      // Find the array
+      const match = raw.match(/\[\s*\[[\s\S]*\]\s*\]/);
+      if (match) {
+        const clean = match[0].replace(/\/\*[^*]*\*\//g, '').replace(/\/\/[^\n]*/g,'');
+        data = JSON.parse(clean);
+      } else {
+        throw new Error('Could not find 2D array');
+      }
+    }
+    if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error('Not a 2D array');
+    pushUndo();
+    map = data.map(row => Array.from(row));
+    mapH = map.length;
+    mapW = map[0].length;
+    document.getElementById('inp-w').value = mapW;
+    document.getElementById('inp-h').value = mapH;
+    panX = 0; panY = 0;
+    resizeCanvas();
+    document.getElementById('modal-bg').classList.remove('open');
+  } catch(err) {
+    alert('Parse error: ' + err.message + '\n\nTip: paste just the raw 2D array like [[0,1,2,...],[...]]');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildPalette();
+initMap(mapW, mapH, 0);
+// Default: forest border + grass interior (matches home island style)
+for (let r = 0; r < mapH; r++)
+  for (let c = 0; c < mapW; c++)
+    if (r < 4 || r >= mapH - 4 || c < 4 || c >= mapW - 4) map[r][c] = 5; // TREE border
+
+resizeCanvas();
+</script>
+</body>
+</html>

@@ -201,6 +201,42 @@ window.QUESTS = [
       claimed:   '"He who understands the cold has already found the fire." — Ice Warden Vex',
     },
   },
+
+  // ── THUNDER PEAK QUESTS ──────────────────────────────────────────────
+  {
+    id: 'q_th1',
+    island: 3,
+    name: 'Into the Storm',
+    npc: 'Storm Exile Aven',
+    npcTileX: 26, npcTileY: 97,
+    description: 'The storms here are alive. Four of them guard the mountain approach.\nClear the way.',
+    objective: { type: 'kill_any', count: 4 },
+    reward: { gold: 600, card: 'demon_121', xp: 0 },
+    prereq: null,
+    dialogue: {
+      locked:    '...(the exile stares into the storm)',
+      active:    'Four storm guardians. Kill them and I\'ll tell you what I know about the peak.',
+      complete:  'Good. The peak holds the last truth Roger left. A card no one was meant to find twice.',
+      claimed:   '"The storm tests everyone. Most don\'t come back. You\'re different." — Storm Exile Aven',
+    },
+  },
+  {
+    id: 'q_th2',
+    island: 3,
+    name: 'Thunder Sovereign',
+    npc: 'Storm Exile Aven',
+    npcTileX: 26, npcTileY: 97,
+    description: 'The Thunder Sovereign guards the peak. He remembers the First Sealing.\nEnd him.',
+    objective: { type: 'kill_boss_id', bossId: 'boss_thunder' },
+    reward: { gold: 2000, card: 'demon_123', xp: 0 },
+    prereq: 'q_th1',
+    dialogue: {
+      locked:    '...(the exile watches the lightning)',
+      active:    'The Sovereign is at the peak. He was the last of the seven. He chose to stay. He said he would wait for the one who found all the truths. That\'s you.',
+      complete:  'He fell. And as he fell, he said: "The card was never the end. It was the beginning of the question." I don\'t know what that means. But you do.',
+      claimed:   '"Seven sat in the circle. Seven chose. One remained. Now none remain." — Final Thunder Stone',
+    },
+  },
 ];
 
 // Build quick lookup
@@ -209,17 +245,12 @@ window.QUESTS.forEach(q => { window.QUEST_MAP[q.id] = q; });
 
 /**
  * Returns the initial quests progress state.
- * q001 is 'active', all others 'locked'.
+ * All quests start locked — talk to the NPC to unlock/activate.
  */
 window.initQuestState = function() {
   const state = {};
-  window.QUESTS.forEach((q, i) => {
-    // Home island: q001 starts active, rest locked until prereq met
-    // Island quests with no prereq start active (unlocked from the start)
-    let status = 'locked';
-    if (i === 0) status = 'active';
-    else if (!q.prereq && q.island !== undefined && q.island !== 0) status = 'active';
-    state[q.id] = { status, progress: 0 };
+  window.QUESTS.forEach(q => {
+    state[q.id] = { status: 'locked', progress: 0 };
   });
   return state;
 };
@@ -269,9 +300,6 @@ window.advanceQuests = function(event) {
         window.GameState.playerMoney += quest.reward.gold;
         if (quest.reward.card) {
           window.GameState.playerCollection.push(quest.reward.card);
-          if (window.GameState.playerDeck.length < 40) {
-            window.GameState.playerDeck.push(quest.reward.card);
-          }
         }
         state.status = 'claimed';
         // Unlock quests whose prereq is now met

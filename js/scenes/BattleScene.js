@@ -20,8 +20,8 @@ class BattleScene extends Phaser.Scene {
     // Extra draw on first turn
     this._relicExtraDraw = _relics.reduce((s, id) => s + (window.RELIC_MAP?.[id]?.effect?.extraDraw || 0), 0);
 
-    const _levelHpBonus = Math.floor(((window.GameState?.playerLevel || 1) - 1) * 2);
-    this.playerMaxLife = 20 + _relicBonusHp + _levelHpBonus;
+    const _hearts = Math.min(5, 3 + Math.floor(Math.max(0, (window.GameState?.playerLevel || 1) - 1) / 3));
+    this.playerMaxLife = (_hearts * 5) + _relicBonusHp;
     this.playerLife    = this.playerMaxLife;
     this.enemyLife   = this.enemyDef.life || 10;
     this.playerMana  = _relicStartMana;
@@ -31,6 +31,8 @@ class BattleScene extends Phaser.Scene {
     this.attackingDemon  = null;
     this.awaitingTarget  = false;
     this.playerGoesFirst = true;
+    this._faceGoldEarned = 0;
+    this._attackArrow    = null;
 
     // Two-row board state
     this.playerFront = [];
@@ -115,8 +117,8 @@ class BattleScene extends Phaser.Scene {
     // Row divider inside enemy side
     bg.lineStyle(1, 0x331111, 0.5); bg.lineBetween(4, 123, 956, 123);
     // Arsenal slot background
-    bg.fillStyle(0x0e0e1a); bg.fillRoundedRect(878, 340, 78, 100, 6);
-    bg.lineStyle(1, 0x445566); bg.strokeRoundedRect(878, 340, 78, 100, 6);
+    bg.fillStyle(0x0a0a1e); bg.fillRoundedRect(872, 238, 84, 115, 8);
+    bg.lineStyle(2, 0x3355aa); bg.strokeRoundedRect(872, 238, 84, 115, 8);
 
     // ── Pitch zone label ───────────────────────────────────────────────
     this.add.text(480, 452, '🔥  PITCH ZONE  — drag here or right-click to sacrifice for mana', {
@@ -138,14 +140,32 @@ class BattleScene extends Phaser.Scene {
     this.txtEnemyGY.on('pointerover', () => this.txtEnemyGY.setStyle({ color: '#cc7777' }));
     this.txtEnemyGY.on('pointerout',  () => this.txtEnemyGY.setStyle({ color: '#664444' }));
 
-    // Clickable enemy face for direct attacks
-    this.btnFace = this.add.text(880, 22, '⚔ FACE', {
-      fontSize: '16px', fontFamily: 'monospace',
-      backgroundColor: '#3a0000', padding: { x: 8, y: 4 }, color: '#ff6666'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    // Clickable enemy face — behind the enemy backline (top of enemy field)
+    const faceZoneBg = this.add.graphics().setDepth(2).setAlpha(0.0);
+    faceZoneBg.fillStyle(0x550000, 0.6);
+    faceZoneBg.fillRoundedRect(340, 10, 280, 28, 8);
+    this._faceZoneBg = faceZoneBg;
+
+    this.btnFace = this.add.text(480, 24, 'DIRECT ATTACK', {
+      fontSize: '12px', fontFamily: 'monospace',
+      color: '#cc3333', stroke: '#000', strokeThickness: 1,
+      padding: { x: 8, y: 3 }
+    }).setOrigin(0.5).setDepth(3).setAlpha(0.35);
+    this.btnFace.setInteractive({ useHandCursor: true });
     this.btnFace.on('pointerdown', () => this.attackFace());
-    this.btnFace.on('pointerover', () => this.btnFace.setStyle({ backgroundColor: '#770000' }));
-    this.btnFace.on('pointerout',  () => this.btnFace.setStyle({ backgroundColor: '#3a0000' }));
+    this.btnFace.on('pointerover', () => {
+      this.btnFace.setStyle({ color: '#ff6666' });
+      if (this.attackingDemon) {
+        const { idx } = this.attackingDemon;
+        const fromX = this._boardDemonX(this.playerFront, idx);
+        const fromY = 285;
+        this._drawAttackArrow(fromX, fromY, 480, 24, 0xff3333);
+      }
+    });
+    this.btnFace.on('pointerout',  () => {
+      this.btnFace.setStyle({ color: '#cc3333' });
+      if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
+    });
 
     // Board zone labels
     this.add.text(185, 50, '— ENEMY SIDE —',   { fontSize: '13px', fontFamily: 'monospace', color: '#442233' }).setOrigin(0, 0);
@@ -156,12 +176,13 @@ class BattleScene extends Phaser.Scene {
     this.add.text(185, 246, 'FRONT (combat)', { fontSize: '10px', fontFamily: 'monospace', color: '#335533' }).setOrigin(0, 0).setAlpha(0.6);
     this.add.text(185, 336, 'REAR (safe)',    { fontSize: '10px', fontFamily: 'monospace', color: '#224422' }).setOrigin(0, 0).setAlpha(0.5);
 
-    this.add.text(480, 513, '— HAND  (hover to zoom · drag to board · right-click to pitch · shift-click → arsenal) —', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#333355'
+    this.add.text(480, 513, '— HAND  (hover: zoom · drag to board: play · drag to PITCH: sacrifice · drag to ARSENAL: stash) —', {
+      fontSize: '10px', fontFamily: 'monospace', color: '#444466'
     }).setOrigin(0.5, 0);
 
     // Arsenal label
-    this.add.text(917, 343, 'ARSENAL', { fontSize: '9px', fontFamily: 'monospace', color: '#445566' }).setOrigin(0.5, 0);
+    this.add.text(914, 242, 'ARSENAL', { fontSize: '11px', fontFamily: 'monospace', fontStyle: 'bold', color: '#5577bb' }).setOrigin(0.5, 0).setDepth(3);
+    this.add.text(914, 344, 'drag here\nto stash', { fontSize: '9px', fontFamily: 'monospace', color: '#334466', align: 'center' }).setOrigin(0.5, 0).setDepth(3);
 
     // ── Enemy HP bar ───────────────────────────────────────────────────
     this._enemyHpBarBg = this.add.graphics().setDepth(2);
@@ -211,7 +232,7 @@ class BattleScene extends Phaser.Scene {
     concede.on('pointerdown', () => {
       if (this.gameOver) return;
       this.gameOver = true;
-      this.showResult('loss');
+      this.endBattle('lose');
     });
 
     // ── Relic indicators (tiny badges right of graveyard) ──────────────
@@ -232,22 +253,22 @@ class BattleScene extends Phaser.Scene {
     }
 
     // ── Battle Log panel ───────────────────────────────────────────────
-    const LOG_ROWS = 12;
+    const LOG_ROWS = 9;
     const logBg = this.add.graphics().setDepth(2);
-    logBg.fillStyle(0x06060f, 0.92); logBg.fillRoundedRect(0, 50, 172, 175, 4);
-    logBg.lineStyle(1, 0x222244);    logBg.strokeRoundedRect(0, 50, 172, 175, 4);
+    logBg.fillStyle(0x06060f, 0.92); logBg.fillRoundedRect(0, 50, 178, 165, 4);
+    logBg.lineStyle(1, 0x222244);    logBg.strokeRoundedRect(0, 50, 178, 165, 4);
     this.add.text(6, 54, 'BATTLE LOG', {
-      fontSize: '10px', fontFamily: 'monospace', color: '#444466'
+      fontSize: '11px', fontFamily: 'monospace', color: '#555577'
     }).setDepth(3);
-    this._logScrollTxt = this.add.text(166, 54, '', {
+    this._logScrollTxt = this.add.text(172, 54, '', {
       fontSize: '9px', fontFamily: 'monospace', color: '#333355'
     }).setOrigin(1, 0).setDepth(3);
 
     this._logTextObjs = [];
     for (let i = 0; i < LOG_ROWS; i++) {
       this._logTextObjs.push(
-        this.add.text(6, 66 + i * 13, '', {
-          fontSize: '10px', fontFamily: 'monospace', color: '#888899', wordWrap: { width: 160 }
+        this.add.text(6, 68 + i * 16, '', {
+          fontSize: '11px', fontFamily: 'monospace', color: '#888899'
         }).setDepth(3)
       );
     }
@@ -451,15 +472,15 @@ class BattleScene extends Phaser.Scene {
     this._tickPoison(this.enemyRear, false);
     this._tickPoison(this.playerFront, true);
     this._tickPoison(this.playerRear, true);
-    // Face poison (Plague Surge)
-    if (this._enemyFacePoison > 0) {
-      this.enemyLife -= this._enemyFacePoison;
-      this.showFloat(700, 80, 'Plague! -' + this._enemyFacePoison, '#44ff44');
-      this._enemyFacePoison = Math.max(0, this._enemyFacePoison - 1);
+    // Face poison (Plague Surge) — fixed-damage per turn for N turns
+    if (this._enemyFacePoisonTurns > 0) {
+      this.enemyLife -= this._enemyFacePoisonDmg;
+      this.showFloat(700, 80, 'Plague! -' + this._enemyFacePoisonDmg, '#44ff44');
+      this._enemyFacePoisonTurns--;
     }
-    if (this._playerFacePoison > 0) {
-      this.playerLife -= this._playerFacePoison;
-      this._playerFacePoison = Math.max(0, this._playerFacePoison - 1);
+    if (this._playerFacePoisonTurns > 0) {
+      this.playerLife -= this._playerFacePoisonDmg;
+      this._playerFacePoisonTurns--;
     }
     this.checkWin();
 
@@ -493,6 +514,7 @@ class BattleScene extends Phaser.Scene {
     this.btnEndTurn.setAlpha(0.4);
     this.txtTurn.setText('ENEMY TURN...');
     this.turn = 'enemy';
+    this._killStreak = 0; // combo resets at start of enemy turn
 
     this.playerGraveyard.push(...this.playerHand);
     this.playerHand = [];
@@ -643,6 +665,7 @@ class BattleScene extends Phaser.Scene {
                 this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
               }
               this._flashScreen(0xff0000);
+              this.cameras.main.shake(180, 0.006);
               this.showFloat(340, 460, '-' + demon.currentAtk + '!', '#ff2222');
               this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
             }
@@ -654,6 +677,7 @@ class BattleScene extends Phaser.Scene {
             this.enemyLife = Math.min(this.enemyDef.life, this.enemyLife + demon.currentAtk);
           }
           this._flashScreen(0xff0000);
+          this.cameras.main.shake(220, 0.009);
           this.showFloat(340, 460, '-' + demon.currentAtk + ' (UNBLOCKABLE)!', '#ff2222');
           this.addLog(demon.name + ' hits you for ' + demon.currentAtk, '#ff3333');
         }
@@ -796,6 +820,21 @@ class BattleScene extends Phaser.Scene {
     this.playerMana -= card.cost;
     this.playerHand.splice(handIdx, 1);
     this.clearPopup();
+
+    // ◈ GOD CARD — instant victory
+    if (card.id === 'god_card') {
+      this.addLog('◈ THE FIRST ONE awakens. Reality bows.', '#ff00ff');
+      this.showFloat(480, 250, '◈ CARD KING ◈', '#ff88ff');
+      this.cameras.main.flash(800, 255, 220, 255);
+      this.cameras.main.shake(600, 0.02);
+      this.time.delayedCall(900, () => {
+        this.gameOver = true;
+        this.endBattle('win');
+      });
+      this.renderAll(); this.updateUI();
+      return;
+    }
+
     if (card.type === 'demon') {
       const hasHaste = card.ability && card.ability.includes('haste');
       const hasDivineShield = card.ability && card.ability.includes('divine_shield');
@@ -806,6 +845,14 @@ class BattleScene extends Phaser.Scene {
       const rowLabel = targetRow === 'rear' ? 'rear' : 'front';
       const atkStr = atkBonus > 0 ? ' (+' + atkBonus + ' collar)' : '';
       this.showFloat(480, 285, card.name + ' enters the ' + rowLabel + '!' + atkStr, '#ffcc44');
+      // Summon sparkle at board position
+      this.time.delayedCall(80, () => {
+        const row = targetRow === 'front' ? this.playerFront : this.playerRear;
+        const idx = row.length - 1;
+        const sx = this._boardDemonX(row, idx);
+        const sy = targetRow === 'front' ? 285 : 375;
+        this._spawnDeathParticles(sx, sy, 0xffcc44);
+      });
       this.addLog('You play ' + card.name + ' to ' + rowLabel + ' (' + (card.atk + atkBonus) + '/' + card.hp + ')', '#ffdd44');
       this.resolveDemonBattlecry(card, 'player');
     } else {
@@ -1215,6 +1262,7 @@ class BattleScene extends Phaser.Scene {
       this._doubleNextSpell = false;
     }
     const fx = (x, y, msg, col) => { if (me) this.showFloat(x, y, msg, col); };
+    this._spellEffect(card, who);
     switch (card.effect) {
       case 'damage':
         if (me) { this.enemyLife  -= card.value; fx(700, 80, card.name + '! -' + card.value, '#ff6600'); }
@@ -1507,13 +1555,16 @@ class BattleScene extends Phaser.Scene {
         fx(340, 285, 'Cure! All poison removed!', '#44ff88');
         break;
       case 'poison_face':
+        // Deal card.value damage now, then card.value per turn for 2 more turns
         if (me) {
           this.enemyLife -= card.value;
-          this._enemyFacePoison = (this._enemyFacePoison || 0) + card.value;
-          fx(700, 80, 'Plague Surge! -' + card.value + ' now + more!', '#44ff44');
+          this._enemyFacePoisonDmg   = card.value;
+          this._enemyFacePoisonTurns = 2;
+          fx(700, 80, 'Plague Surge! -' + card.value + ' now, +' + card.value + '/turn x2!', '#44ff44');
         } else {
           this.playerLife -= card.value;
-          this._playerFacePoison = (this._playerFacePoison || 0) + card.value;
+          this._playerFacePoisonDmg   = card.value;
+          this._playerFacePoisonTurns = 2;
         }
         break;
     }
@@ -1622,6 +1673,69 @@ class BattleScene extends Phaser.Scene {
     this.time.delayedCall(80, () => spark.destroy());
   }
 
+  _spellEffect(card, caster) {
+  // caster: 'player' or 'enemy'
+  const isPlayer = caster === 'player';
+  const targetX  = isPlayer ? 700 : 340;
+  const targetY  = isPlayer ? 120 : 320;
+
+  const dmgEffects  = ['damage','aoe_enemy','aoe_all_hp','aoe_demon_dmg','destroy','debuff_atk'];
+  const healEffects = ['heal','resurrect','life_per_demon','buff_hp','buff_atk_all','runed_shield'];
+  const isDmg  = dmgEffects.includes(card.effect);
+  const isHeal = healEffects.includes(card.effect);
+
+  const col = isDmg ? 0xff4400 : isHeal ? 0x00cc44 : 0x4488ff;
+
+  // Ring expand + fade
+  const ring = this.add.graphics().setDepth(16);
+  ring.lineStyle(3, col, 1);
+  ring.strokeCircle(0, 0, 8);
+  ring.x = targetX; ring.y = targetY;
+  this.tweens.add({
+    targets: ring,
+    scaleX: 5, scaleY: 5, alpha: 0,
+    duration: 400, ease: 'Power2',
+    onComplete: () => ring.destroy()
+  });
+
+  // 6 pixel sparks radiating out
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const dist = 36 + Math.floor(Math.random() * 24);
+    const g = this.add.graphics().setDepth(16);
+    g.fillStyle(col, 1);
+    g.fillRect(-3, -3, 6, 6);
+    g.x = targetX; g.y = targetY;
+    this.tweens.add({
+      targets: g,
+      x: targetX + Math.cos(a) * dist,
+      y: targetY + Math.sin(a) * dist,
+      alpha: 0,
+      duration: 320, ease: 'Power1',
+      onComplete: () => g.destroy()
+    });
+  }
+
+  // For AOE spells: sweep across the board
+  if (card.effect === 'aoe_enemy' || card.effect === 'aoe_all_hp' || card.effect === 'aoe_demon_dmg') {
+    const sweepY = isPlayer ? 120 : 320;
+    for (let i = 0; i < 5; i++) {
+      const sx = 200 + i * 130;
+      const bar = this.add.graphics().setDepth(16);
+      bar.fillStyle(col, 0.7);
+      bar.fillRect(-4, -20, 8, 40);
+      bar.x = 200; bar.y = sweepY;
+      this.time.delayedCall(i * 40, () => {
+        this.tweens.add({
+          targets: bar, x: sx, alpha: 0,
+          duration: 280, ease: 'Power1',
+          onComplete: () => bar.destroy()
+        });
+      });
+    }
+  }
+}
+
   cleanBoard(board, discard) {
     for (let i = board.length - 1; i >= 0; i--) {
       if (board[i].currentHp <= 0) {
@@ -1691,7 +1805,28 @@ class BattleScene extends Phaser.Scene {
     this.txtTurn.setText('⚔ Choose a target — enemy demon or FACE button');
   }
 
+  _drawAttackArrow(fromX, fromY, toX, toY, color = 0xff3333) {
+    if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
+    if (!fromX) return;
+    const g = this.add.graphics().setDepth(15);
+    g.lineStyle(3, color, 0.9);
+    g.beginPath();
+    g.moveTo(fromX, fromY);
+    g.lineTo(toX, toY);
+    g.strokePath();
+    // Arrowhead
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    g.fillStyle(color, 1);
+    g.fillTriangle(
+      toX, toY,
+      toX - 12 * Math.cos(angle - 0.4), toY - 12 * Math.sin(angle - 0.4),
+      toX - 12 * Math.cos(angle + 0.4), toY - 12 * Math.sin(angle + 0.4)
+    );
+    this._attackArrow = g;
+  }
+
   cancelAttack() {
+    if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
     this.attackingDemon = null; this.awaitingTarget = false;
     this.btnCancel.setVisible(false); this.renderAll();
     this.txtTurn.setText('YOUR TURN  (turn ' + this.turnNumber + ')');
@@ -1716,8 +1851,27 @@ class BattleScene extends Phaser.Scene {
       }
     }
 
-    this.enemyLife -= demon.currentAtk;
+    // ── Critical hit (15% chance for +50% damage) and gold system ─────────
+    const isCrit = Math.random() < 0.15;
+    const baseDmg = demon.currentAtk;
+    const faceDmg = isCrit ? Math.ceil(baseDmg * 1.5) : baseDmg;
+
+    const diffMod = ({
+      'easy':   0.5,
+      'normal': 1.0,
+      'hard':   1.5,
+      'boss':   2.5,
+    }[this.enemyDef.difficulty || 'normal']) ?? 1.0;
+    const goldEarned = Math.floor(faceDmg * diffMod * (isCrit ? 2 : 1));
+    this._faceGoldEarned = (this._faceGoldEarned || 0) + goldEarned;
+    window.GameState.playerMoney = (window.GameState.playerMoney || 0) + goldEarned;
+    window.saveGame?.();
+
+    this.enemyLife -= faceDmg;
     this._flashScreen(0xffffff);
+    if (isCrit) {
+      this.cameras.main.flash(80, 255, 200, 0);
+    }
     demon.attacksThisTurn = (demon.attacksThisTurn || 0) + 1;
     demon.exhausted = !(demon.ability === 'double_attack' && demon.attacksThisTurn < 2);
     if (demon.ability === 'haste_face_draw' || demon.ability === 'face_damage_draw') {
@@ -1727,11 +1881,22 @@ class BattleScene extends Phaser.Scene {
       this.playerMana += 1; this.showFloat(340, 460, '+1 mana!', '#4499ff');
     }
     if (demon.ability && demon.ability.includes('lifesteal')) {
-      this.playerLife = Math.min(this.playerMaxLife, this.playerLife + demon.currentAtk);
-      this.showFloat(340, 460, '+' + demon.currentAtk + ' (Lifesteal)', '#44ff88');
+      this.playerLife = Math.min(this.playerMaxLife, this.playerLife + faceDmg);
+      this.showFloat(340, 460, '+' + faceDmg + ' (Lifesteal)', '#44ff88');
     }
-    this.showFloat(760, 80, '⚔ -' + demon.currentAtk, '#ff2222');
-    this.addLog(demon.name + ' hits enemy for ' + demon.currentAtk, '#ffee44');
+
+    // Floating gold text
+    const goldColor = isCrit ? '#ffd700' : '#ffcc44';
+    const goldMsg   = isCrit ? '💰 +' + goldEarned + 'G  CRIT!' : '💰 +' + goldEarned + 'G';
+    this.showFloat(480, 60, goldMsg, goldColor);
+
+    if (isCrit) {
+      this.showFloat(760, 80, '💥 CRIT! -' + faceDmg, '#ffd700');
+    } else {
+      this.showFloat(760, 80, '⚔ -' + faceDmg, '#ff2222');
+    }
+    this.addLog(demon.name + ' hits enemy for ' + faceDmg + (isCrit ? ' (CRIT!)' : '') + ' [+' + goldEarned + 'G]', '#ffee44');
+    if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
     this.cancelAttack(); this.updateUI(); this.checkWin();
   }
 
@@ -1755,7 +1920,13 @@ class BattleScene extends Phaser.Scene {
       }
     }
 
-    const dmgToTarget = demon.currentAtk;
+    // ── Critical hit (12% chance for +50% damage) ─────────────────────────
+    const isCrit = Math.random() < 0.12;
+    let dmgToTarget = demon.currentAtk;
+    if (isCrit) {
+      dmgToTarget = Math.ceil(dmgToTarget * 1.5);
+      this.cameras.main.flash(120, 255, 220, 0);
+    }
     const dmgToDemon  = target.currentAtk;
 
     // divine_shield absorbs first hit
@@ -1776,18 +1947,49 @@ class BattleScene extends Phaser.Scene {
 
     if (demon.ability && demon.ability.includes('poisonous') && target.currentHp > 0) target.currentHp = 0;
 
-    this.showFloat(700, 150, '⚔ -' + dmgToTarget, '#ff4444');
+    if (isCrit) {
+      this.showFloat(700, 150, '💥 CRIT! -' + dmgToTarget, '#ffee00');
+      this.cameras.main.shake(140, 0.007);
+    } else {
+      this.showFloat(700, 150, '⚔ -' + dmgToTarget, '#ff4444');
+    }
     this.showFloat(340, 285, '⚔ -' + dmgToDemon, '#ff8888');
-    this.addLog(demon.name + ' attacks ' + target.name + ' (' + dmgToTarget + '/' + dmgToDemon + ')', '#ffee44');
+
+    const targetBoard = targetSide === 'front' ? this.enemyFront : this.enemyRear;
+    const targetIdx   = targetBoard.indexOf(target);
+    if (targetIdx !== -1) {
+      const tx = this._boardDemonX(targetBoard, targetIdx);
+      const ty = targetSide === 'front' ? 78 : 168;
+      this._spawnDeathParticles(tx, ty, isCrit ? 0xffcc00 : 0xff2200);
+    }
+    this.addLog(demon.name + ' attacks ' + target.name + ' (' + dmgToTarget + '/' + dmgToDemon + ')' + (isCrit ? ' CRIT!' : ''), '#ffee44');
 
     if (target.currentHp <= 0) {
       this.addLog(target.name + ' dies', '#ff6644');
       this.killFrom(targetSide === 'front' ? this.enemyFront : this.enemyRear, this.enemyGraveyard, target);
+      // ── Kill streak / combo ────────────────────────────────────────────
+      this._killStreak = (this._killStreak || 0) + 1;
+      this._maxKillStreak = Math.max(this._maxKillStreak || 0, this._killStreak);
+      const ks = this._killStreak;
+      if (ks === 2) {
+        this.showFloat(480, 200, 'DOUBLE KILL!', '#ffcc00');
+        this.cameras.main.shake(120, 0.005);
+      } else if (ks === 3) {
+        this.showFloat(480, 200, '⚡ TRIPLE KILL! ⚡', '#ff8800');
+        this.cameras.main.flash(160, 255, 140, 0);
+        this.cameras.main.shake(180, 0.008);
+      } else if (ks >= 4) {
+        this.showFloat(480, 200, '🔥 RAMPAGE x' + ks + '! 🔥', '#ff4400');
+        this.cameras.main.flash(200, 255, 80, 0);
+        this.cameras.main.shake(220, 0.011);
+      }
     }
     if (demon.currentHp <= 0) {
       this.addLog(demon.name + ' dies', '#ff8866');
       this.killFrom(this.playerFront, this.playerGraveyard, demon);
+      this._killStreak = 0; // streak resets when your demon dies
     }
+    if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
     this.cancelAttack(); this.updateUI(); this.checkWin();
   }
 
@@ -1870,10 +2072,13 @@ class BattleScene extends Phaser.Scene {
     if (this.dragGhost) { this.dragGhost.destroy(); this.dragGhost = null; }
     this.hideDragHighlights();
 
-    const inPitchZone = y >= this.PITCH_Y && y <= this.PITCH_Y + this.PITCH_H && x >= 180 && x <= 780;
-    const inBoardZone = y >= this.BOARD_Y && y <= this.BOARD_Y + this.BOARD_H;
+    const inPitchZone   = y >= this.PITCH_Y && y <= this.PITCH_Y + this.PITCH_H && x >= 180 && x <= 780;
+    const inBoardZone   = y >= this.BOARD_Y && y <= this.BOARD_Y + this.BOARD_H;
+    const inArsenalZone = x >= 872 && x <= 956 && y >= 238 && y <= 353;
 
-    if (inPitchZone) {
+    if (inArsenalZone) {
+      this.sendToArsenal(card, handIdx);
+    } else if (inPitchZone) {
       this.pitchCard(card, handIdx);
     } else if (inBoardZone) {
       // Determine front vs rear based on y position
@@ -1944,6 +2149,15 @@ class BattleScene extends Phaser.Scene {
       fontSize: '16px', fontFamily: 'monospace', color: '#ff7744'
     }).setOrigin(0.5).setDepth(12);
     this._dragHlObjs.push(p, pt);
+
+    // Arsenal drop zone highlight
+    const ars = this.add.graphics().setDepth(12);
+    ars.fillStyle(0x2244ff, 0.25); ars.fillRoundedRect(872, 238, 84, 115, 8);
+    ars.lineStyle(2, 0x6688ff, 0.95); ars.strokeRoundedRect(872, 238, 84, 115, 8);
+    const arst = this.add.text(914, 295, 'STASH', {
+      fontSize: '13px', fontFamily: 'monospace', fontStyle: 'bold', color: '#8899ff'
+    }).setOrigin(0.5).setDepth(12);
+    this._dragHlObjs.push(ars, arst);
   }
 
   hideDragHighlights() {
@@ -2004,11 +2218,15 @@ class BattleScene extends Phaser.Scene {
       );
     }
 
-    if (card.type === 'demon' && card.desc) {
+    if (card.desc) {
+      const descY = card.type === 'demon'
+        ? py + (card.abilityDesc ? 78 : 54)
+        : py + (card.abilityDesc ? 74 : 30);
       this._zoomObjs.push(
-        this.add.text(px, py + (card.abilityDesc ? 78 : 54), card.desc, {
-          fontSize: '10px', fontFamily: 'monospace', color: '#aaaaaa',
-          wordWrap: { width: W-24 }, align: 'center'
+        this.add.text(px, descY, card.desc, {
+          fontSize: '11px', fontFamily: 'monospace',
+          color: card.type === 'demon' ? '#aaaaaa' : '#ccccff',
+          wordWrap: { width: W-20 }, align: 'center'
         }).setOrigin(0.5, 0).setDepth(25.1)
       );
     }
@@ -2120,14 +2338,16 @@ class BattleScene extends Phaser.Scene {
   }
 
   _refreshLog() {
-    const LOG_ROWS = 12;
+    const LOG_ROWS = 9;
     const total    = this._logLines.length;
     this._logScroll = Phaser.Math.Clamp(this._logScroll, 0, Math.max(0, total - LOG_ROWS));
     const startIdx = Math.max(0, total - LOG_ROWS - this._logScroll);
     this._logTextObjs.forEach((t, i) => {
       const entry = this._logLines[startIdx + i];
-      if (entry) { t.setText(entry.msg); t.setStyle({ color: entry.color }); }
-      else        t.setText('');
+      if (entry) {
+        const m = entry.msg.length > 22 ? entry.msg.substring(0, 21) + '…' : entry.msg;
+        t.setText(m); t.setStyle({ color: entry.color });
+      } else { t.setText(''); }
     });
     if (total > LOG_ROWS) {
       const showing = startIdx + LOG_ROWS;
@@ -2293,65 +2513,75 @@ class BattleScene extends Phaser.Scene {
 
   renderArsenal() {
     this.clear(this._arsenalObjs);
-    const AX = 917, AY = 360; // center of arsenal slot
+    const AX = 914, AY = 300; // center of arsenal slot
 
     if (!this.arsenalCard) {
       const empty = this.add.text(AX, AY, 'empty', {
-        fontSize: '9px', fontFamily: 'monospace', color: '#334455'
+        fontSize: '10px', fontFamily: 'monospace', color: '#334455'
       }).setOrigin(0.5).setDepth(5);
       this._arsenalObjs.push(empty);
       return;
     }
 
     const card = this.arsenalCard;
-    const W = 66, H = 86;
+    const W = 70, H = 90;
     const DEPTH = 5;
 
     const g = this.add.graphics().setDepth(DEPTH);
-    g.fillStyle(0x1a1a2e); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 5);
-    g.lineStyle(2, 0x445599); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 5);
+    g.fillStyle(0x12122a); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 6);
+    g.lineStyle(2, 0x5577cc); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 6);
     this._arsenalObjs.push(g);
 
-    const artSize = 40;
-    const artImg = this.add.image(AX, AY - 10, this.artKey(card))
+    const artSize = 44;
+    const artImg = this.add.image(AX, AY - 8, this.artKey(card))
       .setDisplaySize(artSize, artSize).setDepth(DEPTH + .1);
     this._arsenalObjs.push(artImg);
 
     this._arsenalObjs.push(
-      this.add.text(AX, AY - H/2 + 3, card.name, {
-        fontSize: '8px', fontFamily: 'monospace', color: '#aaaadd',
+      this.add.text(AX, AY - H/2 + 4, card.name, {
+        fontSize: '9px', fontFamily: 'monospace', color: '#aaaaee',
         wordWrap: { width: W - 4 }, align: 'center'
       }).setOrigin(0.5, 0).setDepth(DEPTH + .2)
     );
 
-    const infoLine = card.type === 'demon' ? '⚔' + card.atk + ' ❤' + card.hp : 'spell';
+    const infoLine = card.type === 'demon' ? '⚔' + card.atk + ' ❤' + card.hp
+      : (card.desc || 'spell').substring(0, 12);
     this._arsenalObjs.push(
-      this.add.text(AX, AY + H/2 - 14, infoLine, {
-        fontSize: '9px', fontFamily: 'monospace', color: '#ffcc44'
+      this.add.text(AX, AY + H/2 - 15, infoLine, {
+        fontSize: '9px', fontFamily: 'monospace',
+        color: card.type === 'demon' ? '#ffcc44' : '#aaaaff',
+        wordWrap: { width: W - 4 }, align: 'center'
       }).setOrigin(0.5, 0).setDepth(DEPTH + .2)
     );
 
     // Cost badge
     const cg = this.add.graphics().setDepth(DEPTH + .1);
-    cg.fillStyle(0x000088); cg.fillCircle(AX - W/2 + 8, AY - H/2 + 8, 8);
+    cg.fillStyle(0x000099); cg.fillCircle(AX - W/2 + 9, AY - H/2 + 9, 9);
     this._arsenalObjs.push(cg,
-      this.add.text(AX - W/2 + 8, AY - H/2 + 8, '' + (card.cost || 0), {
-        fontSize: '8px', fontFamily: 'monospace', color: '#88ccff'
+      this.add.text(AX - W/2 + 9, AY - H/2 + 9, '' + (card.cost || 0), {
+        fontSize: '10px', fontFamily: 'monospace', fontStyle: 'bold', color: '#88ccff'
       }).setOrigin(0.5).setDepth(DEPTH + .2)
+    );
+
+    // PLAY button hint
+    this._arsenalObjs.push(
+      this.add.text(AX, AY + H/2 + 4, '▶ click to play', {
+        fontSize: '8px', fontFamily: 'monospace', color: '#445577'
+      }).setOrigin(0.5, 0).setDepth(DEPTH + .1)
     );
 
     // Hover + click to play
     const zone = this.add.zone(AX, AY, W, H).setDepth(DEPTH + .5).setInteractive({ useHandCursor: true });
     zone.on('pointerover', () => {
       g.clear();
-      g.fillStyle(0x222244); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 5);
-      g.lineStyle(3, 0x8899ff); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 5);
-      this.showZoom(card, AX - 80);
+      g.fillStyle(0x1e1e44); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 6);
+      g.lineStyle(3, 0x99bbff); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 6);
+      this.showZoom(card, AX - 90);
     });
     zone.on('pointerout', () => {
       g.clear();
-      g.fillStyle(0x1a1a2e); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 5);
-      g.lineStyle(2, 0x445599); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 5);
+      g.fillStyle(0x12122a); g.fillRoundedRect(AX-W/2, AY-H/2, W, H, 6);
+      g.lineStyle(2, 0x5577cc); g.strokeRoundedRect(AX-W/2, AY-H/2, W, H, 6);
       this.hideZoom();
     });
     zone.on('pointerdown', (ptr) => {
@@ -2551,11 +2781,19 @@ class BattleScene extends Phaser.Scene {
     zone.on('pointerover', () => {
       g.lineStyle(3, 0xffffff); g.strokeRoundedRect(cx-W/2, cy-H/2, W, H, 6);
       this.showZoom(demon, cx);
+      // Draw attack arrow when hovering a valid target during attack selection
+      if (isEnemy && this.awaitingTarget && this.attackingDemon) {
+        const { demon: attacker, idx } = this.attackingDemon;
+        const fromX = this._boardDemonX(this.playerFront, idx);
+        const fromY = 285;
+        this._drawAttackArrow(fromX, fromY, cx, cy, 0xff3333);
+      }
     });
     zone.on('pointerout', () => {
       g.lineStyle(isValidTarget||isAttacker?3:2, border);
       g.strokeRoundedRect(cx-W/2, cy-H/2, W, H, 6);
       this.hideZoom();
+      if (this._attackArrow) { this._attackArrow.destroy(); this._attackArrow = null; }
     });
     zone.on('pointerdown', (_ptr, _lx, _ly, event) => {
       if (event) event.stopPropagation();
@@ -2606,7 +2844,12 @@ class BattleScene extends Phaser.Scene {
     ov.fillStyle(0x000000, 0.92); ov.fillRect(0,0,960,640);
 
     if (result === 'win') {
-      const rawMoney = Phaser.Math.Between(this.enemyDef.rewardMoney[0], this.enemyDef.rewardMoney[1]);
+      let rawMoney = Phaser.Math.Between(this.enemyDef.rewardMoney[0], this.enemyDef.rewardMoney[1]);
+      // Combo bonus: +10% per streak level earned during battle
+      const maxStreak = this._maxKillStreak || 0;
+      if (maxStreak >= 3) rawMoney = Math.floor(rawMoney * (1 + (maxStreak - 2) * 0.1));
+      // Reduce post-battle reward since face-attack gold is earned mid-combat
+      rawMoney = Math.floor(rawMoney * 0.4);
       const money    = Math.floor(rawMoney * (this._relicGoldBonus || 1.0));
       const cardDrop = Math.random() < 0.38 && this.enemyDef.rewardCard ? this.enemyDef.rewardCard : null;
       const isBoss = this.enemyDef.isBoss || this.enemyDef.difficulty === 'boss';
@@ -2645,7 +2888,11 @@ class BattleScene extends Phaser.Scene {
         color: victoryColor, stroke: '#000', strokeThickness: 6
       }).setOrigin(0.5).setDepth(21);
 
-      this.add.text(480, 300, '+' + money + 'G' + (cardDrop ? '\n+ ' + window.CARD_MAP[cardDrop].name : ''), {
+      const streakBonus = maxStreak >= 3 ? '\n🔥 Streak x' + maxStreak + ' bonus!' : '';
+      const faceGoldNote = this._faceGoldEarned > 0
+        ? '\n⚔ Face gold: +' + this._faceGoldEarned + 'G (already earned)'
+        : '';
+      this.add.text(480, 300, '+' + money + 'G end bonus' + (cardDrop ? '\n+ ' + window.CARD_MAP[cardDrop].name : '') + faceGoldNote + streakBonus, {
         fontSize: '24px', fontFamily: 'monospace', color: '#ffee88',
         stroke: '#000', strokeThickness: 4, align: 'center'
       }).setOrigin(0.5).setDepth(21);
@@ -2682,15 +2929,24 @@ class BattleScene extends Phaser.Scene {
       btn.on('pointerout',  () => btn.setStyle({ color: '#44ff44' }));
 
     } else {
+      // Calculate hearts lost based on difficulty
+      const diff = this.enemyDef.difficulty || 'normal';
+      let heartsLost = 2;
+      if (diff === 'easy')   heartsLost = 1;
+      if (diff === 'normal') heartsLost = 2;
+      if (diff === 'hard')   heartsLost = 3;
+      if (diff === 'boss')   heartsLost = 5;
+
       this.add.text(480, 230, 'DEFEATED...', {
         fontSize: '50px', fontFamily: 'monospace', fontStyle: 'bold',
         color: '#ff2222', stroke: '#000', strokeThickness: 6
       }).setOrigin(0.5).setDepth(21);
 
       const hearts = window.GameState.hearts ?? 3;
-      const penaltyMsg = hearts <= 1
-        ? 'LAST HEART — gold lost on death!'
-        : '♥ Lost a heart  (' + (hearts - 1) + ' remain)';
+      const heartsAfter = Math.max(0, hearts - heartsLost);
+      const penaltyMsg = heartsAfter <= 0
+        ? 'LAST HEART — gold lost on death!  (-' + heartsLost + '♥)'
+        : '♥ Lost ' + heartsLost + ' heart' + (heartsLost !== 1 ? 's' : '') + '  (' + heartsAfter + ' remain)';
       this.add.text(480, 315, penaltyMsg, {
         fontSize: '18px', fontFamily: 'monospace', color: '#ff8888',
         stroke: '#000', strokeThickness: 3,
@@ -2701,7 +2957,7 @@ class BattleScene extends Phaser.Scene {
         stroke: '#000', strokeThickness: 4
       }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => {
-        this.scene.get('WorldScene').events.emit('battleLost');
+        this.scene.get('WorldScene').events.emit('battleLost', { heartsLost });
         this.scene.stop(); this.scene.resume('WorldScene');
       });
       btn.on('pointerover', () => btn.setStyle({ color: '#ffaaaa' }));
@@ -2734,6 +2990,13 @@ class BattleScene extends Phaser.Scene {
     const pCol = pRatio > 0.5 ? 0x22cc44 : pRatio > 0.25 ? 0xcc8800 : 0xdd2222;
     this._playerHpBar.fillStyle(pCol);
     this._playerHpBar.fillRoundedRect(10, 494, Math.floor(BAR_W * pRatio), BAR_H, 3);
+
+    // Show face zone brighter when player has a demon selected (attackingDemon set)
+    if (this.btnFace) {
+      const canFace = !!this.attackingDemon;
+      this.btnFace.setAlpha(canFace ? 1.0 : 0.35);
+      if (this._faceZoneBg) this._faceZoneBg.setAlpha(canFace ? 0.6 : 0.0);
+    }
   }
 
   // ═══════════════ CARD ART KEY ══════════════════════════════════════════

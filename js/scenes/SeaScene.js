@@ -204,7 +204,6 @@ class SeaScene extends Phaser.Scene {
           const card = pool[Math.floor(Math.random() * pool.length)];
           if (card) {
             window.GameState.playerCollection.push(card.id);
-            if (window.GameState.playerDeck.length < 40) window.GameState.playerDeck.push(card.id);
           }
           return card ? 'Found: ' + card.name + '!' : 'Nothing useful inside.';
         },
@@ -246,7 +245,6 @@ class SeaScene extends Phaser.Scene {
           const card = window.CARD_MAP?.[id];
           if (card) {
             window.GameState.playerCollection.push(id);
-            if (window.GameState.playerDeck.length < 40) window.GameState.playerDeck.push(id);
             return 'Found island card: ' + card.name + '!';
           }
           return 'Nothing useful.';

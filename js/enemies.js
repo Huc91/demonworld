@@ -381,4 +381,99 @@ window.ENEMIES = [
       'spell_060','spell_003','spell_005','spell_015','spell_007',
     ],
   },
+
+  // ══════════════════════════════════════════════════════
+  //  THUNDER PEAK — lightning enemies
+  // ══════════════════════════════════════════════════════
+  {
+    id: 'enemy_th1', name: 'Spark Runner', level: 2, sprite: 'enemy_0',
+    moveSpeed: 55, life: 20, rewardMoney: [45, 75], rewardCard: null,
+    difficulty: 'normal', isBoss: false,
+    deckCards: [
+      'demon_118','demon_118','demon_118','demon_118','demon_119',
+      'demon_119','demon_119','demon_001','demon_001','demon_002',
+      'demon_002','demon_006','demon_006','spell_001','spell_001',
+      'spell_013','spell_013','spell_066','spell_066','spell_004',
+      'spell_004','demon_005','demon_005','demon_003','demon_003',
+      'spell_009','spell_009','demon_118','demon_119','spell_066',
+    ],
+  },
+  {
+    id: 'enemy_th2', name: 'Cloud Witch', level: 3, sprite: 'enemy_1',
+    moveSpeed: 45, life: 22, rewardMoney: [50, 80], rewardCard: 'demon_118',
+    difficulty: 'normal', isBoss: false,
+    deckCards: [
+      'demon_118','demon_118','demon_119','demon_119','demon_119',
+      'demon_120','demon_120','demon_001','demon_001','demon_006',
+      'demon_006','spell_066','spell_066','spell_013','spell_013',
+      'spell_001','spell_001','spell_004','spell_004','spell_067',
+      'demon_005','demon_005','demon_011','demon_011','demon_003',
+      'spell_009','demon_118','demon_119','spell_066','spell_067',
+    ],
+  },
+  {
+    id: 'enemy_th3', name: 'Storm Warrior', level: 5, sprite: 'enemy_2',
+    moveSpeed: 40, life: 25, rewardMoney: [70, 100], rewardCard: 'demon_119',
+    difficulty: 'normal', isBoss: false,
+    deckCards: [
+      'demon_118','demon_118','demon_119','demon_119','demon_119',
+      'demon_120','demon_120','demon_121','demon_121','demon_006',
+      'demon_006','spell_066','spell_066','spell_067','spell_067',
+      'spell_013','spell_013','spell_001','spell_001','spell_004',
+      'spell_004','demon_005','demon_012','demon_012','demon_011',
+      'spell_009','demon_119','demon_121','spell_066','spell_067',
+    ],
+  },
+  {
+    id: 'enemy_th4', name: 'Thunderclap Mage', level: 6, sprite: 'enemy_4',
+    moveSpeed: 38, life: 28, rewardMoney: [80, 120], rewardCard: 'demon_120',
+    difficulty: 'hard', isBoss: false,
+    deckCards: [
+      'demon_118','demon_119','demon_119','demon_120','demon_120',
+      'demon_121','demon_121','demon_122','demon_001','demon_006',
+      'demon_012','spell_066','spell_066','spell_066','spell_067',
+      'spell_067','spell_013','spell_001','spell_003','spell_004',
+      'spell_004','demon_005','demon_011','demon_015','demon_019',
+      'spell_009','demon_120','demon_121','spell_066','spell_067',
+    ],
+  },
+  {
+    id: 'enemy_th5', name: 'Sky Colossus', level: 8, sprite: 'enemy_6',
+    moveSpeed: 25, life: 32, rewardMoney: [120, 160], rewardCard: 'demon_121',
+    difficulty: 'hard', isBoss: false,
+    deckCards: [
+      'demon_119','demon_120','demon_120','demon_121','demon_121',
+      'demon_122','demon_122','demon_012','demon_012','demon_019',
+      'demon_019','spell_066','spell_066','spell_067','spell_067',
+      'spell_003','spell_003','spell_001','spell_001','spell_015',
+      'spell_015','demon_021','demon_021','demon_022','demon_020',
+      'spell_009','demon_121','demon_122','spell_066','spell_067',
+    ],
+  },
+  {
+    id: 'enemy_th6', name: 'Thunder Wraith', level: 9, sprite: 'enemy_7',
+    moveSpeed: 20, life: 33, rewardMoney: [150, 200], rewardCard: 'demon_122',
+    difficulty: 'hard', isBoss: false,
+    deckCards: [
+      'demon_120','demon_121','demon_121','demon_122','demon_122',
+      'demon_123','demon_012','demon_012','demon_019','demon_020',
+      'demon_020','spell_066','spell_066','spell_067','spell_067',
+      'spell_003','spell_003','spell_015','spell_015','spell_001',
+      'spell_001','demon_021','demon_021','demon_022','spell_009',
+      'spell_009','demon_122','demon_121','spell_066','spell_067',
+    ],
+  },
+  {
+    id: 'enemy_th7', name: 'Thunder Sovereign', level: 10, sprite: 'enemy_9',
+    moveSpeed: 12, life: 38, rewardMoney: [900, 900], rewardCard: 'demon_123',
+    difficulty: 'boss', isBoss: true,
+    deckCards: [
+      'demon_121','demon_122','demon_122','demon_123','demon_123',
+      'demon_120','demon_120','demon_019','demon_020','demon_020',
+      'demon_021','spell_066','spell_066','spell_066','spell_067',
+      'spell_067','spell_003','spell_003','spell_015','spell_015',
+      'spell_001','spell_001','demon_022','demon_022','demon_023',
+      'spell_009','demon_123','demon_122','spell_066','spell_067',
+    ],
+  },
 ];
